@@ -43,10 +43,10 @@ ifeq ($(TARGET),i686-unknown-redox)
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
-	export LD=x86_64-linux-gnu-ld
-	export AR=x86_64-linux-gnu-ar
-	export NM=x86_64-linux-gnu-nm
+	export CC=cc
+	export LD=ld
+	export AR=ar
+	export NM=nm
 	export OBJCOPY=objcopy
 	export CPPFLAGS=
 	LD_SO_PATH=lib/ld64.so.1
