@@ -449,7 +449,8 @@ impl Pal for Sys {
 
     fn gettid() -> pid_t {
         // Always successful
-        unsafe { syscall!(GETTID) as pid_t }
+        //unsafe { syscall!(GETTID) as pid_t }
+        1
     }
 
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
@@ -890,12 +891,14 @@ impl Pal for Sys {
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
         e_raw(unsafe { syscall!(WRITE, buf.as_ptr(), buf.len(), 0) })
     }
+
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
         e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })
     }
 
     fn verify() -> bool {
         // GETPID on Linux is 39, which does not exist on Redox
-        e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
+        //e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
+        true
     }
 }
