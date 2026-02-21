@@ -20,9 +20,12 @@ mod pal;
 
 pub use self::sys::Sys;
 
-#[cfg(target_os = "linux")]
-#[path = "linux/mod.rs"]
+#[path = "elysia/mod.rs"]
 pub(crate) mod sys;
+
+//#[cfg(target_os = "linux")]
+//#[path = "linux/mod.rs"]
+//pub(crate) mod sys;
 
 #[cfg(target_os = "redox")]
 #[path = "redox/mod.rs"]
