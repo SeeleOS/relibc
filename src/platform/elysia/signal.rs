@@ -1,4 +1,7 @@
-use crate::header::signal::sigval;
+use crate::{
+    header::signal::sigval,
+    platform::{Pal, sys},
+};
 use core::{mem, ptr::addr_of};
 
 use super::{
@@ -46,7 +49,7 @@ impl PalSignal for Sys {
     }
 
     fn raise(sig: c_int) -> Result<()> {
-        let tid = e_raw(unsafe { syscall!(GETTID) })? as pid_t;
+        let tid = e_raw(Sys::gettid() as usize)? as pid_t;
         e_raw(unsafe { syscall!(TKILL, tid, sig) })?;
         Ok(())
     }

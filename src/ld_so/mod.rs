@@ -5,6 +5,7 @@
 #![warn(warnings, unused_variables)]
 
 use core::{mem, ptr};
+use elysia_os_lib::syscalls;
 use object::{
     Endianness,
     elf::{self, ProgramHeader32, ProgramHeader64},
@@ -42,6 +43,9 @@ pub fn static_init(
     sp: &'static Stack,
     #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
 ) {
+    syscalls::print("static init startz").unwrap();
+    let fmt = format!("{:?}", sp.argc);
+    syscalls::print(&fmt).unwrap();
     const SIZEOF_PHDR64: usize = mem::size_of::<ProgramHeader64<Endianness>>();
     const SIZEOF_PHDR32: usize = mem::size_of::<ProgramHeader32<Endianness>>();
 
@@ -49,7 +53,10 @@ pub fn static_init(
     let mut phent_opt = None;
     let mut phnum_opt = None;
 
+    syscalls::print("sp.auxv()").unwrap();
     let mut auxv = sp.auxv();
+    syscalls::print(format!("{:?}", unsafe { *auxv }).as_str()).unwrap();
+    syscalls::print("sp.auxv() done").unwrap();
     loop {
         let (kind, value) = unsafe { *auxv };
         if kind == AT_NULL {
@@ -65,10 +72,13 @@ pub fn static_init(
 
         auxv = unsafe { auxv.add(1) };
     }
+    syscalls::print("auxv thingy done").unwrap();
 
     let phdr = phdr_opt.expect_notls("failed to find AT_PHDR");
     let phent = phent_opt.expect_notls("failed to find AT_PHENT");
     let phnum = phnum_opt.expect_notls("failed to find AT_PHNUM");
+
+    syscalls::print("Static init 1").unwrap();
 
     for i in 0..phnum {
         let ph_addr = phdr + phent * i;
@@ -98,6 +108,8 @@ pub fn static_init(
             _ => panic_notls(format_args!("unknown AT_PHENT size {}", phent)),
         };
 
+        syscalls::print("Static init 2").unwrap();
+
         let page_size = Sys::getpagesize();
         let voff = p_vaddr % page_size;
         // let vaddr = ph.p_vaddr as usize - voff;
@@ -109,6 +121,8 @@ pub fn static_init(
             } else {
                 p_memsz
             };
+
+            syscalls::print("static init 3").unwrap();
 
             unsafe {
                 STATIC_TCB_MASTER.ptr = p_vaddr as *const u8;
@@ -191,11 +205,15 @@ pub unsafe fn init(
     }
 
     if tp == 0 {
+        use elysia_os_lib::syscalls;
+
+        syscalls::print("Static init").unwrap();
         static_init(
             sp,
             #[cfg(target_os = "redox")]
             thr_fd,
         );
+        syscalls::print("Static init done").unwrap();
     } else {
         // The thread fd must already be present in the already existing TCB. Don't close it.
         #[cfg(target_os = "redox")]

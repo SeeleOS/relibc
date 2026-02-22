@@ -1,7 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use elysia_os_lib::syscalls;
+use elysia_os_lib::syscalls::{self, allocate_mem, get_thread_id, print};
 
 use super::{Pal, types::*};
 use crate::{
@@ -451,8 +451,7 @@ impl Pal for Sys {
 
     fn gettid() -> pid_t {
         // Always successful
-        //unsafe { syscall!(GETTID) as pid_t }
-        1
+        get_thread_id().unwrap() as i32
     }
 
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
@@ -555,7 +554,10 @@ impl Pal for Sys {
         fildes: c_int,
         off: off_t,
     ) -> Result<*mut c_void> {
-        Ok(e_raw(syscall!(MMAP, addr, len, prot, flags, fildes, off))? as *mut c_void)
+        let addr = allocate_mem(len as u64, flags as u64).unwrap();
+        print("mmapped").unwrap();
+
+        Ok(addr as *mut c_void)
     }
 
     unsafe fn mremap(
@@ -711,7 +713,7 @@ impl Pal for Sys {
 
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
-            thread_id: unsafe { syscall!(GETTID) },
+            thread_id: Sys::gettid() as usize,
         }
     }
 
