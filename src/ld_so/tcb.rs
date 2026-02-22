@@ -338,7 +338,6 @@ impl Tcb {
 
     // os_arch_activate for elysia_os
     unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
-        syscalls::print("set fs").unwrap();
         set_fs(tls_end as u64).unwrap();
     }
 
