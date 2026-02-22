@@ -1,7 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use elysia_os_lib::syscalls::{self, allocate_mem, get_thread_id, print};
+use elysia_os_lib::syscalls::{self, allocate_mem, futex, get_thread_id, print};
 
 use super::{Pal, types::*};
 use crate::{
@@ -298,25 +298,12 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        let deadline = deadline.map_or(0, |d| d as *const _ as usize);
-        e_raw(unsafe {
-            syscall!(
-                FUTEX, addr,       // uaddr
-                9,          // futex_op: FUTEX_WAIT_BITSET
-                val,        // val
-                deadline,   // timeout: deadline
-                0,          // uaddr2/val2: 0/NULL
-                0xffffffff  // val3: FUTEX_BITSET_MATCH_ANY
-            )
-        })
-        .map(|_| ())
+        futex::wait(addr, u64::from(val)).unwrap();
+        Ok(())
     }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
-        e_raw(unsafe {
-            syscall!(FUTEX, addr, 1 /* FUTEX_WAKE */, num)
-        })
-        .map(|n| n as u32)
+        Ok(futex::wake(addr, u64::from(num)).unwrap() as u32)
     }
 
     unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
