@@ -1,6 +1,8 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
+use elysia_os_lib::syscalls;
+
 use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
@@ -889,7 +891,11 @@ impl Pal for Sys {
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
-        e_raw(unsafe { syscall!(WRITE, buf.as_ptr(), buf.len(), 0) })
+        if fildes == 1 || fildes == 2 {
+            Ok(syscalls::print_buf(buf, buf.len() as u64).unwrap())
+        } else {
+            unimplemented!()
+        }
     }
 
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {

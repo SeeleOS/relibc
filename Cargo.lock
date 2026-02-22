@@ -190,6 +190,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "elysia-os-lib"
+version = "0.1.4"
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -483,6 +487,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "dlmalloc",
+ "elysia-os-lib",
  "generic-rt",
  "ioslice",
  "libc",

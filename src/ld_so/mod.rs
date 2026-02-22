@@ -139,12 +139,13 @@ pub unsafe fn init(
 ) {
     let tp: usize;
 
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
-        const ARCH_GET_FS: usize = 0x1003;
-        let mut val = 0usize;
-        syscall!(ARCH_PRCTL, ARCH_GET_FS, &raw mut val);
-        tp = val;
+        use alloc::string::ToString;
+        use elysia_os_lib::syscalls::{self, get_fs};
+
+        syscalls::print("get fs").unwrap();
+        tp = get_fs().unwrap();
+        syscalls::print(tp.to_string().as_str()).unwrap();
     }
     #[cfg(target_arch = "aarch64")]
     unsafe {
