@@ -1,7 +1,4 @@
-use crate::{
-    header::signal::sigval,
-    platform::{Pal, sys},
-};
+use crate::{header::signal::sigval, platform::Pal};
 use core::{mem, ptr::addr_of};
 
 use super::{
