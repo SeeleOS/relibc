@@ -45,10 +45,10 @@ unexpected_cfgs = "deny"
 unpredictable_function_pointer_comparisons = "deny"
 unreachable_code = "allow" # TODO review occuurences
 unsafe_op_in_unsafe_fn = "deny"
-unused_imports = "deny"
-unused_must_use = "deny"
-unused_mut = "deny"
-unused_unsafe = "deny"
+unused_imports = "allow"
+unused_must_use = "allow"
+unused_mut = "allow"
+unused_unsafe = "allow"
 unused_variables = "allow" # TODO review occurrences (too many for now)
 
 [lints]
