@@ -175,9 +175,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        unsafe {
-            syscall!(EXIT, status);
-        }
+        syscalls::exit().unwrap();
         loop {}
     }
     unsafe fn exit_thread(_stack_base: *mut (), _stack_size: usize) -> ! {
@@ -542,7 +540,6 @@ impl Pal for Sys {
         off: off_t,
     ) -> Result<*mut c_void> {
         let addr = allocate_mem(len as u64, flags as u64).unwrap();
-        print("mmapped").unwrap();
 
         Ok(addr as *mut c_void)
     }
