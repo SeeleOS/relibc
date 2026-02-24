@@ -539,9 +539,10 @@ impl Pal for Sys {
         fildes: c_int,
         off: off_t,
     ) -> Result<*mut c_void> {
-        let addr = allocate_mem(len as u64, flags as u64).unwrap();
-
-        Ok(addr as *mut c_void)
+        match allocate_mem(len as u64, flags as u64) {
+            Ok(addr) => Ok(addr as *mut c_void),
+            Err(e) => Err(Errno(0)),
+        }
     }
 
     unsafe fn mremap(
