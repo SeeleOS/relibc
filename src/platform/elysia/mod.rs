@@ -1,7 +1,11 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use elysia_os_lib::syscalls::{self, allocate_mem, futex, get_thread_id, print};
+use elysia_os_lib::syscalls::{
+    self, allocate_mem, futex, get_thread_id,
+    object::{read_object, write_object},
+    print,
+};
 
 use super::{Pal, types::*};
 use crate::{
@@ -703,7 +707,7 @@ impl Pal for Sys {
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
-        e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })
+        Ok(read_object(fildes as u64, buf).unwrap())
     }
     fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<usize> {
         e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
@@ -878,11 +882,7 @@ impl Pal for Sys {
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
-        if fildes == 1 || fildes == 2 {
-            Ok(syscalls::print_buf(buf, buf.len() as u64).unwrap())
-        } else {
-            unimplemented!()
-        }
+        Ok(write_object(fildes as u64, buf).unwrap())
     }
 
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
