@@ -3,7 +3,7 @@ use core::arch::asm;
 
 use elysia_os_lib::syscalls::{
     self, allocate_mem, futex, get_thread_id,
-    object::{read_object, write_object},
+    object::{configurate_object, read_object, write_object},
     print,
 };
 
@@ -79,7 +79,7 @@ pub struct Sys;
 impl Sys {
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
         // TODO: Somehow support varargs to syscall??
-        Ok(e_raw(syscall!(IOCTL, fd, request, out))? as c_int)
+        Ok(configurate_object(fd as u64, request, out as *mut u8).unwrap() as i32)
     }
 
     // fn times(out: *mut tms) -> clock_t {
