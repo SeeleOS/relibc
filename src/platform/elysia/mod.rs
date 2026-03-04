@@ -886,7 +886,9 @@ impl Pal for Sys {
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
-        Ok(write_object(fildes as u64, buf).unwrap())
+        panic!("a");
+        Ok(114514)
+        //Ok(write_object(fildes as u64, buf).unwrap())
     }
 
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
