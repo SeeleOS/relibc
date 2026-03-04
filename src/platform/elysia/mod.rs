@@ -105,7 +105,6 @@ impl Pal for Sys {
     }
 
     fn chdir(path: CStr) -> Result<()> {
-        print("i chdir ed");
         change_dir(path.as_ptr(), path.len() as u64);
         Ok(())
     }
