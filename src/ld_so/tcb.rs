@@ -6,7 +6,7 @@ use core::{
     ptr, slice,
     sync::atomic::AtomicBool,
 };
-use elysia_os_lib::syscalls::{self, set_fs};
+use elysiaos_syslib::syscalls::{self, set_fs};
 use generic_rt::GenericTcb;
 
 use crate::{

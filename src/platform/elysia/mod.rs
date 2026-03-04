@@ -1,8 +1,10 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use elysia_os_lib::syscalls::{
-    self, allocate_mem, futex, get_thread_id,
+use elysiaos_syslib::syscalls::{
+    self, allocate_mem,
+    filesystem::change_dir,
+    futex, get_thread_id,
     object::{configurate_object, read_object, write_object},
     print,
 };
@@ -103,7 +105,9 @@ impl Pal for Sys {
     }
 
     fn chdir(path: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
+        print("i chdir ed");
+        change_dir(path.as_ptr(), path.len() as u64);
+        Ok(())
     }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
