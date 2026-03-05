@@ -29,7 +29,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
 };
-use core::{num::NonZeroU64, ptr, slice};
+use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
