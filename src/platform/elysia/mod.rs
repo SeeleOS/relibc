@@ -1,9 +1,10 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
+use alloc::slice;
 use elysiaos_syslib::syscalls::{
     self, allocate_mem,
-    filesystem::change_dir,
+    filesystem::{change_dir, get_current_directory},
     futex, get_thread_id,
     object::{configurate_object, read_object, write_object},
     print,
@@ -28,7 +29,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
 };
-use core::{num::NonZeroU64, ptr};
+use core::{num::NonZeroU64, ptr, slice};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
@@ -320,13 +321,12 @@ impl Pal for Sys {
     }
 
     fn getcwd(mut buf: Out<[u8]>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                GETCWD,
-                buf.as_mut_ptr().as_mut_ptr(),
-                buf.as_mut_ptr().len()
-            )
-        })?;
+        unsafe {
+            get_current_directory(slice::from_raw_parts_mut(
+                buf.as_mut_ptr() as *mut u8,
+                buf.len(),
+            ))
+        };
         Ok(())
     }
 
