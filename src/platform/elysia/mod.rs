@@ -28,6 +28,7 @@ use crate::{
     },
     ld_so::tcb::OsSpecific,
     out::Out,
+    pthread::set_cancel_state,
 };
 use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
@@ -286,7 +287,7 @@ impl Pal for Sys {
     }
 
     unsafe fn fork() -> Result<pid_t> {
-        Ok(e_raw(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) })? as pid_t)
+        Ok(syscalls::fork().unwrap() as i32)
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
