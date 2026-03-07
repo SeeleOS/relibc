@@ -10,6 +10,7 @@
 #![feature(alloc_error_handler)]
 #![feature(allocator_api)]
 #![feature(c_variadic)]
+#![feature(str_from_raw_parts)]
 #![feature(core_intrinsics)]
 #![feature(macro_derive)]
 #![feature(maybe_uninit_slice)]

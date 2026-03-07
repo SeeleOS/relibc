@@ -1,9 +1,9 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::asm;
 
-use alloc::slice;
+use alloc::{slice, str};
 use elysiaos_syslib::syscalls::{
-    self, allocate_mem,
+    self, allocate_mem, execve,
     filesystem::{change_dir, get_current_directory},
     futex, get_thread_id,
     object::{configurate_object, read_object, write_object},
@@ -162,7 +162,7 @@ impl Pal for Sys {
     }
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
-        e_raw(syscall!(EXECVE, path.as_ptr(), argv, envp))?;
+        unsafe { execve(str::from_raw_parts(path.as_ptr() as *const u8, path.len())).unwrap() };
         unreachable!()
     }
     unsafe fn fexecve(
