@@ -5,7 +5,7 @@ use alloc::{slice, str};
 use elysiaos_syslib::{
     syscalls::{
         self, allocate_mem, execve,
-        filesystem::{change_dir, get_current_directory, open_file},
+        filesystem::{change_dir, file_info, get_current_directory, open_file},
         futex, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
         print,
@@ -242,13 +242,13 @@ impl Pal for Sys {
         let empty = b"\0";
         let empty_ptr = empty.as_ptr() as *const c_char;
         e_raw(unsafe {
-            syscall!(
-                NEWFSTATAT,
-                fildes,
+            process_result(file_info(
+                false,
+                true,
                 empty_ptr,
-                buf.as_mut_ptr(),
-                AT_EMPTY_PATH
-            )
+                buf.as_mut_ptr() as *mut u8,
+                fildes as u64,
+            ))
         })
         .map(|_| ())
     }
