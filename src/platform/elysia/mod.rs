@@ -2,12 +2,15 @@
 use core::arch::asm;
 
 use alloc::{slice, str};
-use elysiaos_syslib::syscalls::{
-    self, allocate_mem, execve,
-    filesystem::{change_dir, get_current_directory},
-    futex, get_thread_id,
-    object::{configurate_object, read_object, write_object},
-    print,
+use elysiaos_syslib::{
+    syscalls::{
+        self, allocate_mem, execve,
+        filesystem::{change_dir, get_current_directory, open_file},
+        futex, get_thread_id,
+        object::{configurate_object, read_object, write_object},
+        print,
+    },
+    utils::process_result,
 };
 
 use super::{Pal, types::*};
@@ -30,7 +33,7 @@ use crate::{
     out::Out,
     pthread::set_cancel_state,
 };
-use core::{num::NonZeroU64, ptr};
+use core::{num::NonZeroU64, ptr, str::from_utf8};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
@@ -162,7 +165,17 @@ impl Pal for Sys {
     }
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
-        unsafe { execve(str::from_raw_parts(path.as_ptr() as *const u8, path.len())).unwrap() };
+        unsafe {
+            print("Called execve");
+            execve(
+                from_utf8(slice::from_raw_parts(
+                    path.as_ptr() as *const u8,
+                    path.len(),
+                ))
+                .unwrap(),
+            )
+            .unwrap()
+        };
         unreachable!()
     }
     unsafe fn fexecve(
@@ -592,8 +605,7 @@ impl Pal for Sys {
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
-            .map(|fd| fd as c_int)
+        e_raw(process_result(open_file(path.as_ptr()))).map(|fd| fd as c_int)
     }
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
