@@ -7,7 +7,7 @@ use elysiaos_syslib::{
         self, allocate_mem, execve,
         filesystem::{change_dir, get_current_directory, open_file},
         futex, get_thread_id,
-        object::{configurate_object, read_object, write_object},
+        object::{configurate_object, read_object, remove_object, write_object},
         print,
     },
     utils::process_result,
@@ -153,7 +153,7 @@ impl Pal for Sys {
     }
 
     fn close(fildes: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(CLOSE, fildes) }).map(|_| ())
+        e_raw(process_result(remove_object(fildes as u64))).map(|_| ())
     }
 
     fn dup(fildes: c_int) -> Result<c_int> {
