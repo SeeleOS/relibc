@@ -8,6 +8,7 @@ use elysiaos_syslib::{
         filesystem::{change_dir, file_info, get_current_directory, open_file},
         futex, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
+        wait_for_process_exit,
     },
     utils::process_result,
 };
@@ -883,15 +884,10 @@ impl Pal for Sys {
     }
 
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
-        e_raw(unsafe {
-            syscall!(
-                WAIT4,
-                pid,
-                stat_loc.map_or(core::ptr::null_mut(), |mut o| o.as_mut_ptr()),
-                options,
-                0
-            )
-        })
+        e_raw(process_result(wait_for_process_exit(
+            pid,
+            stat_loc.map_or(core::ptr::null_mut(), |mut o| o.as_mut_ptr()),
+        )))
         .map(|p| p as pid_t)
     }
 
