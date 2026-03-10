@@ -196,7 +196,7 @@ impl Pal for Sys {
 
     fn exit(status: c_int) -> ! {
         syscalls::exit(status as u64).unwrap();
-        loop {}
+        panic!("Exit returned");
     }
     unsafe fn exit_thread(_stack_base: *mut (), _stack_size: usize) -> ! {
         // TODO
