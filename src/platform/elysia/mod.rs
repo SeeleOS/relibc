@@ -8,7 +8,6 @@ use elysiaos_syslib::{
         filesystem::{change_dir, file_info, get_current_directory, open_file},
         futex, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
-        print,
     },
     utils::process_result,
 };
@@ -166,7 +165,6 @@ impl Pal for Sys {
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
         unsafe {
-            print("Called execve");
             execve(
                 from_utf8(slice::from_raw_parts(
                     path.as_ptr() as *const u8,
