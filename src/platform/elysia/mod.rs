@@ -172,6 +172,8 @@ impl Pal for Sys {
                     path.len(),
                 ))
                 .unwrap(),
+                argv,
+                envp,
             )
             .unwrap()
         };
