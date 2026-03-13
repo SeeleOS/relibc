@@ -2,7 +2,7 @@
 use core::arch::asm;
 
 use alloc::{slice, str};
-use elysiaos_syslib::{
+use seele_syslib::{
     syscalls::{
         self, allocate_mem, execve,
         filesystem::{change_dir, file_info, get_current_directory, open_file},

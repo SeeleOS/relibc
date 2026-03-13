@@ -20,7 +20,7 @@ mod pal;
 
 pub use self::sys::Sys;
 
-#[path = "elysia/mod.rs"]
+#[path = "seele/mod.rs"]
 pub(crate) mod sys;
 
 //#[cfg(target_os = "linux")]

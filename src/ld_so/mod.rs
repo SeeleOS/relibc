@@ -141,7 +141,7 @@ pub unsafe fn init(
     let tp: usize;
 
     {
-        use elysiaos_syslib::syscalls::get_fs;
+        use seele_syslib::syscalls::get_fs;
 
         tp = get_fs().unwrap();
     }

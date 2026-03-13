@@ -87,7 +87,7 @@ libm = "0.2"
 log = "0.4"
 spin = "0.9.8"
 argon2 = "0.5.3"
-elysiaos-syslib = { path = "../elysiaos-syslib/", version = "0.1.8" }
+seele-syslib = { path = "../seele-syslib/", version = "0.1.8" }
 
 [dependencies.dlmalloc]
 path = "dlmalloc-rs"

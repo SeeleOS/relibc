@@ -6,7 +6,7 @@ use core::{
     ptr, slice,
     sync::atomic::AtomicBool,
 };
-use elysiaos_syslib::syscalls::{self, set_fs};
+use seele_syslib::syscalls::{self, set_fs};
 use generic_rt::GenericTcb;
 
 use crate::{
@@ -336,7 +336,7 @@ impl Tcb {
         Ok((abi, tls, tcb))
     }
 
-    // os_arch_activate for elysia_os
+    // os_arch_activate for seele
     unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
         set_fs(tls_end as u64).unwrap();
     }
