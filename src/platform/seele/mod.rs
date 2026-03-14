@@ -722,7 +722,7 @@ impl Pal for Sys {
         let _ = (clock_id, evp);
         if !timerid.as_mut_ptr().is_null() {
             unsafe {
-                *timerid.as_mut_ptr() = 0;
+                *timerid.as_mut_ptr() = core::ptr::null_mut();
             }
         }
         Sys::stub("TIMER_CREATE").map(|_| ())
