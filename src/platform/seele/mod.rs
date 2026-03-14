@@ -52,16 +52,6 @@ fn syscall_stub() -> usize {
     0
 }
 
-macro_rules! syscall {
-    ($n:ident $(, $arg:expr )* ) => {{
-        // Currently Seele does not implement the Linux-style syscall `$n`.
-        // Route everything through a common stub so higher-level libc
-        // functions see a successful, no-op implementation.
-        let _ = stringify!($n);
-        syscall_stub()
-    }};
-}
-
 mod epoll;
 mod ptrace;
 mod signal;
