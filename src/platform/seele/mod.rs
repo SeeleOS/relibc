@@ -1,6 +1,3 @@
-#[cfg(target_arch = "x86_64")]
-use core::arch::asm;
-
 use alloc::{slice, str};
 use seele_syslib::{
     syscalls::{
@@ -39,18 +36,6 @@ use crate::{
     error::{Errno, Result},
     header::{bits_time::timespec, sys_utsname::utsname},
 };
-
-/// Stub for unimplemented Linux-style syscalls on Seele.
-/// Prints a message once per call site and returns success (0) so
-/// callers that expect `Result` see an `Ok(())`.
-fn syscall_stub(name: &str) -> Result<usize> {
-    use core::fmt::Write;
-
-    // Best-effort logging to stderr; ignore all errors.
-    let mut w = super::FileWriter::new(2);
-    let _ = w.write_str("unimplemented systemcall {name}\n");
-    Ok(0)
-}
 
 mod epoll;
 mod ptrace;
@@ -96,6 +81,17 @@ pub fn e_raw(sys: usize) -> Result<usize> {
 pub struct Sys;
 
 impl Sys {
+    /// Stub for unimplemented Linux-style syscalls on Seele.
+    /// Prints a message and returns Ok(0) to indicate a no-op success.
+    pub(crate) fn stub(name: &str) -> Result<usize> {
+        use core::fmt::Write;
+
+        // Best-effort logging to stderr; ignore all errors.
+        let mut w = super::FileWriter::new(2);
+        let _ = w.write_fmt(format_args!("unimplemented systemcall {name}\n"));
+        Ok(0)
+    }
+
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
         // TODO: Somehow support varargs to syscall??
         Ok(configurate_object(fd as u64, request, out as *mut u8).unwrap() as i32)
@@ -109,16 +105,19 @@ impl Sys {
 impl Pal for Sys {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
+        let _ = (path, mode);
+        Sys::stub("ACCESS").map(|_| ())
     }
 
     #[cfg(target_arch = "aarch64")]
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FACCESSAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
+        let _ = (path, mode);
+        Sys::stub("FACCESSAT").map(|_| ())
     }
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
-        Ok(e_raw(unsafe { syscall!(BRK, addr) })? as *mut c_void)
+        let _ = addr;
+        Ok(Sys::stub("BRK")? as *mut c_void)
     }
 
     fn chdir(path: CStr) -> Result<()> {
@@ -127,41 +126,28 @@ impl Pal for Sys {
     }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
+        let _ = (path, mode);
+        Sys::stub("FCHMODAT").map(|_| ())
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        let flags: c_int = 0;
-        e_raw(unsafe {
-            syscall!(
-                FCHOWNAT,
-                AT_FDCWD,
-                path.as_ptr(),
-                owner as u32,
-                group as u32,
-                flags
-            )
-        })
-        .map(|_| ())
+        let _ = (path, owner, group);
+        Sys::stub("FCHOWNAT").map(|_| ())
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                CLOCK_GETRES,
-                clk_id,
-                res.map_or(core::ptr::null_mut(), |mut p| p.as_mut_ptr())
-            )
-        })
-        .map(|_| ())
+        let _ = (clk_id, res);
+        Sys::stub("CLOCK_GETRES").map(|_| ())
     }
 
     fn clock_gettime(clk_id: clockid_t, mut tp: Out<timespec>) -> Result<()> {
-        e_raw(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp.as_mut_ptr()) }).map(|_| ())
+        let _ = (clk_id, tp.as_mut_ptr());
+        Sys::stub("CLOCK_GETTIME").map(|_| ())
     }
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()> {
-        e_raw(syscall!(CLOCK_SETTIME, clk_id, tp)).map(|_| ())
+        let _ = (clk_id, tp);
+        Sys::stub("CLOCK_SETTIME").map(|_| ())
     }
 
     fn close(fildes: c_int) -> Result<()> {
@@ -169,11 +155,13 @@ impl Pal for Sys {
     }
 
     fn dup(fildes: c_int) -> Result<c_int> {
-        e_raw(unsafe { syscall!(DUP, fildes) }).map(|f| f as c_int)
+        let _ = fildes;
+        Ok(Sys::stub("DUP")? as c_int)
     }
 
     fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int> {
-        e_raw(unsafe { syscall!(DUP3, fildes, fildes2, 0) }).map(|f| f as c_int)
+        let _ = (fildes, fildes2);
+        Ok(Sys::stub("DUP3")? as c_int)
     }
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
@@ -196,17 +184,8 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
-        let empty = b"\0";
-        let empty_ptr = empty.as_ptr() as *const c_char;
-        e_raw(syscall!(
-            EXECVEAT,
-            fildes,
-            empty_ptr,
-            argv,
-            envp,
-            AT_EMPTY_PATH
-        ))?;
-        unreachable!()
+        let _ = (fildes, argv, envp);
+        Sys::stub("EXECVEAT").map(|_| ())
     }
 
     fn exit(status: c_int) -> ! {
@@ -219,36 +198,33 @@ impl Pal for Sys {
     }
 
     fn fchdir(fildes: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHDIR, fildes) }).map(|_| ())
+        let _ = fildes;
+        Sys::stub("FCHDIR").map(|_| ())
     }
 
     fn fchmod(fildes: c_int, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHMOD, fildes, mode) }).map(|_| ())
+        let _ = (fildes, mode);
+        Sys::stub("FCHMOD").map(|_| ())
     }
 
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                FCHMODAT,
-                dirfd,
-                path.map_or(core::ptr::null(), |p| p.as_ptr()),
-                mode,
-                flags
-            )
-        })
-        .map(|_| ())
+        let _ = (dirfd, path, mode, flags);
+        Sys::stub("FCHMODAT").map(|_| ())
     }
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FCHOWN, fildes, owner, group) }).map(|_| ())
+        let _ = (fildes, owner, group);
+        Sys::stub("FCHOWN").map(|_| ())
     }
 
     fn fdatasync(fildes: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FDATASYNC, fildes) }).map(|_| ())
+        let _ = fildes;
+        Sys::stub("FDATASYNC").map(|_| ())
     }
 
     fn flock(fd: c_int, operation: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FLOCK, fd, operation) }).map(|_| ())
+        let _ = (fd, operation);
+        Sys::stub("FLOCK").map(|_| ())
     }
 
     fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
@@ -267,16 +243,8 @@ impl Pal for Sys {
     }
 
     fn fstatat(fildes: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                NEWFSTATAT,
-                fildes,
-                path.map_or(core::ptr::null(), |s| s.as_ptr()),
-                buf.as_mut_ptr(),
-                flags
-            )
-        })
-        .map(|_| ())
+        let _ = (fildes, path, buf.as_mut_ptr(), flags);
+        Sys::stub("NEWFSTATAT").map(|_| ())
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
@@ -284,7 +252,8 @@ impl Pal for Sys {
 
         let mut kbuf = linux_statfs::default();
         let kbuf_ptr = &mut kbuf as *mut linux_statfs;
-        e_raw(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) })?;
+        let _ = (fildes, kbuf_ptr);
+        Sys::stub("FSTATFS")?;
 
         if !buf.is_null() {
             unsafe {
@@ -309,7 +278,8 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
-        Ok(e_raw(unsafe { syscall!(FCNTL, fildes, cmd, arg) })? as c_int)
+        let _ = (fildes, cmd, arg);
+        Ok(Sys::stub("FCNTL")? as c_int)
     }
 
     unsafe fn fork() -> Result<pid_t> {
@@ -322,11 +292,13 @@ impl Pal for Sys {
     }
 
     fn fsync(fildes: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(FSYNC, fildes) }).map(|_| ())
+        let _ = fildes;
+        Sys::stub("FSYNC").map(|_| ())
     }
 
     fn ftruncate(fildes: c_int, length: off_t) -> Result<()> {
-        e_raw(unsafe { syscall!(FTRUNCATE, fildes, length) }).map(|_| ())
+        let _ = (fildes, length);
+        Sys::stub("FTRUNCATE").map(|_| ())
     }
 
     #[inline]
@@ -340,11 +312,13 @@ impl Pal for Sys {
     }
 
     unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }).map(|_| ())
+        let _ = (fd, times);
+        Sys::stub("UTIMENSAT").map(|_| ())
     }
 
     unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
+        let _ = (path, times);
+        Sys::stub("UTIMENSAT").map(|_| ())
     }
 
     fn getcwd(mut buf: Out<[u8]>) -> Result<()> {
@@ -358,11 +332,12 @@ impl Pal for Sys {
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize> {
-        e_raw(unsafe { syscall!(GETDENTS64, fd, buf.as_mut_ptr(), buf.len()) })
+        let _ = (fd, buf);
+        Sys::stub("GETDENTS64")
     }
     fn dir_seek(fd: c_int, off: u64) -> Result<()> {
-        e_raw(unsafe { syscall!(LSEEK, fd, off, SEEK_SET) })?;
-        Ok(())
+        let _ = (fd, off);
+        Sys::stub("LSEEK").map(|_| ())
     }
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
         let dent = this_dent.as_ptr().cast::<dirent>();
@@ -370,28 +345,20 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        // Always successful
-        unsafe { syscall!(GETEGID) as gid_t }
+        Sys::stub("GETEGID").unwrap_or(0) as gid_t
     }
 
     fn geteuid() -> uid_t {
-        // Always successful
-        unsafe { syscall!(GETEUID) as uid_t }
+        Sys::stub("GETEUID").unwrap_or(0) as uid_t
     }
 
     fn getgid() -> gid_t {
-        // Always successful
-        unsafe { syscall!(GETGID) as gid_t }
+        Sys::stub("GETGID").unwrap_or(0) as gid_t
     }
 
     fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
-        Ok(e_raw(unsafe {
-            syscall!(
-                GETGROUPS,
-                list.len() as c_int,
-                list.as_mut_ptr().as_mut_ptr()
-            )
-        })? as c_int)
+        let _ = list.as_mut_ptr();
+        Ok(Sys::stub("GETGROUPS")? as c_int)
     }
 
     fn getpagesize() -> usize {
@@ -399,29 +366,31 @@ impl Pal for Sys {
     }
 
     fn getpgid(pid: pid_t) -> Result<pid_t> {
-        Ok(e_raw(unsafe { syscall!(GETPGID, pid) })? as pid_t)
+        let _ = pid;
+        Ok(Sys::stub("GETPGID")? as pid_t)
     }
 
     fn getpid() -> pid_t {
-        // Always successful
-        unsafe { syscall!(GETPID) as pid_t }
+        Sys::stub("GETPID").unwrap_or(0) as pid_t
     }
 
     fn getppid() -> pid_t {
-        // Always successful
-        unsafe { syscall!(GETPPID) as pid_t }
+        Sys::stub("GETPPID").unwrap_or(0) as pid_t
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
-        Ok(e_raw(unsafe { syscall!(GETPRIORITY, which, who) })? as c_int)
+        let _ = (which, who);
+        Ok(Sys::stub("GETPRIORITY")? as c_int)
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
-        e_raw(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) })
+        let _ = (buf, flags);
+        Sys::stub("GETRANDOM")
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
-        e_raw(unsafe { syscall!(GETRLIMIT, resource, rlim.as_mut_ptr()) }).map(|_| ())
+        let _ = (resource, rlim.as_mut_ptr());
+        Sys::stub("GETRLIMIT").map(|_| ())
     }
 
     fn getresgid(
@@ -429,43 +398,31 @@ impl Pal for Sys {
         egid: Option<Out<gid_t>>,
         sgid: Option<Out<gid_t>>,
     ) -> Result<()> {
-        unsafe {
-            e_raw(syscall!(
-                GETRESGID,
-                rgid.map_or(0, |mut r| r.as_mut_ptr() as usize),
-                egid.map_or(0, |mut r| r.as_mut_ptr() as usize),
-                sgid.map_or(0, |mut r| r.as_mut_ptr() as usize)
-            ))
-            .map(|_| ())
-        }
+        let _ = (rgid, egid, sgid);
+        Sys::stub("GETRESGID").map(|_| ())
     }
     fn getresuid(
         ruid: Option<Out<uid_t>>,
         euid: Option<Out<uid_t>>,
         suid: Option<Out<uid_t>>,
     ) -> Result<()> {
-        unsafe {
-            e_raw(syscall!(
-                GETRESUID,
-                ruid.map_or(0, |mut r| r.as_mut_ptr() as usize),
-                euid.map_or(0, |mut r| r.as_mut_ptr() as usize),
-                suid.map_or(0, |mut r| r.as_mut_ptr() as usize)
-            ))
-            .map(|_| ())
-        }
+        let _ = (ruid, euid, suid);
+        Sys::stub("GETRESUID").map(|_| ())
     }
 
     unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> Result<()> {
-        e_raw(syscall!(SETRLIMIT, resource, rlimit)).map(|_| ())
+        let _ = (resource, rlimit);
+        Sys::stub("SETRLIMIT").map(|_| ())
     }
 
     fn getrusage(who: c_int, mut r_usage: Out<rusage>) -> Result<()> {
-        e_raw(unsafe { syscall!(GETRUSAGE, who, r_usage.as_mut_ptr()) })?;
-        Ok(())
+        let _ = (who, r_usage.as_mut_ptr());
+        Sys::stub("GETRUSAGE").map(|_| ())
     }
 
     fn getsid(pid: pid_t) -> Result<pid_t> {
-        Ok(e_raw(unsafe { syscall!(GETSID, pid) })? as pid_t)
+        let _ = pid;
+        Ok(Sys::stub("GETSID")? as pid_t)
     }
 
     fn gettid() -> pid_t {
@@ -474,60 +431,39 @@ impl Pal for Sys {
     }
 
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                GETTIMEOFDAY,
-                tp.as_mut_ptr(),
-                tzp.map_or(0, |mut p| p.as_mut_ptr() as usize)
-            )
-        })
-        .map(|_| ())
+        let _ = (tp.as_mut_ptr(), tzp);
+        Sys::stub("GETTIMEOFDAY").map(|_| ())
     }
 
     fn getuid() -> uid_t {
-        unsafe { syscall!(GETUID) as uid_t }
+        Sys::stub("GETUID").unwrap_or(0) as uid_t
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
+        let _ = (path, owner, group);
+        Sys::stub("LCHOWN").map(|_| ())
     }
 
     #[cfg(target_arch = "aarch64")]
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                FCHOWNAT,
-                AT_FDCWD,
-                path.as_ptr(),
-                owner as u32,
-                group as u32,
-                crate::header::fcntl::AT_SYMLINK_NOFOLLOW
-            )
-        })
-        .map(|_| ())
+        let _ = (path, owner, group);
+        Sys::stub("FCHOWNAT").map(|_| ())
     }
 
     fn link(path1: CStr, path2: CStr) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                LINKAT,
-                AT_FDCWD,
-                path1.as_ptr(),
-                AT_FDCWD,
-                path2.as_ptr(),
-                0
-            )
-        })
-        .map(|_| ())
+        let _ = (path1, path2);
+        Sys::stub("LINKAT").map(|_| ())
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
-        e_raw(unsafe { syscall!(LSEEK, fildes, offset, whence) }).map(|o| o as off_t)
+        let _ = (fildes, offset, whence);
+        Ok(Sys::stub("LSEEK")? as off_t)
     }
 
     fn mkdirat(dir_fildes: c_int, path: CStr, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(MKDIRAT, dir_fildes, path.as_ptr(), mode) }).map(|_| ())
+        let _ = (dir_fildes, path, mode);
+        Sys::stub("MKDIRAT").map(|_| ())
     }
 
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
@@ -542,7 +478,8 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
 
-        e_raw(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }).map(|_| ())
+        let _ = (dir_fildes, path, mode, k_dev);
+        Sys::stub("MKNODAT").map(|_| ())
     }
 
     fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
@@ -558,11 +495,13 @@ impl Pal for Sys {
     }
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()> {
-        e_raw(unsafe { syscall!(MLOCK, addr, len) }).map(|_| ())
+        let _ = (addr, len);
+        Sys::stub("MLOCK").map(|_| ())
     }
 
     unsafe fn mlockall(flags: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(MLOCKALL, flags) }).map(|_| ())
+        let _ = flags;
+        Sys::stub("MLOCKALL").map(|_| ())
     }
 
     unsafe fn mmap(
@@ -586,35 +525,42 @@ impl Pal for Sys {
         flags: c_int,
         args: *mut c_void,
     ) -> Result<*mut c_void> {
-        Ok(e_raw(syscall!(MREMAP, addr, len, new_len, flags, args))? as *mut c_void)
+        let _ = (addr, len, new_len, flags, args);
+        Ok(Sys::stub("MREMAP")? as *mut c_void)
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<()> {
-        e_raw(syscall!(MPROTECT, addr, len, prot)).map(|_| ())
+        let _ = (addr, len, prot);
+        Sys::stub("MPROTECT").map(|_| ())
     }
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
-        e_raw(syscall!(MSYNC, addr, len, flags)).map(|_| ())
+        let _ = (addr, len, flags);
+        Sys::stub("MSYNC").map(|_| ())
     }
 
     unsafe fn munlock(addr: *const c_void, len: usize) -> Result<()> {
-        e_raw(syscall!(MUNLOCK, addr, len)).map(|_| ())
+        let _ = (addr, len);
+        Sys::stub("MUNLOCK").map(|_| ())
     }
 
     unsafe fn munlockall() -> Result<()> {
-        e_raw(unsafe { syscall!(MUNLOCKALL) }).map(|_| ())
+        Sys::stub("MUNLOCKALL").map(|_| ())
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()> {
-        e_raw(syscall!(MUNMAP, addr, len)).map(|_| ())
+        let _ = (addr, len);
+        Sys::stub("MUNMAP").map(|_| ())
     }
 
     unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
-        e_raw(syscall!(MADVISE, addr, len, flags)).map(|_| ())
+        let _ = (addr, len, flags);
+        Sys::stub("MADVISE").map(|_| ())
     }
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
-        e_raw(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }).map(|_| ())
+        let _ = (rqtp, rmtp);
+        Sys::stub("NANOSLEEP").map(|_| ())
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
@@ -622,12 +568,13 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
+        let _ = (fildes.as_mut_ptr(), flags);
+        Sys::stub("PIPE2").map(|_| ())
     }
 
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
-        let length = length.get();
-        e_raw(unsafe { syscall!(FALLOCATE, fd, 0, offset, length) }).map(|_| ())
+        let _ = (fd, offset, length);
+        Sys::stub("FALLOCATE").map(|_| ())
     }
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
@@ -661,58 +608,8 @@ impl Pal for Sys {
         stack: *mut usize,
         _os_specific: &mut OsSpecific,
     ) -> Result<crate::pthread::OsTid> {
-        let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
-        let pid;
-        unsafe {
-            asm!("
-                # Call clone syscall
-                syscall
-
-                # Check if child or parent
-                test rax, rax
-                jnz 2f
-
-                # Load registers
-                pop rax
-                pop rdi
-                pop rsi
-                pop rdx
-                pop rcx
-                pop r8
-                pop r9
-
-                # Call entry point
-                call rax
-
-                # Exit
-                mov rax, 60
-                xor rdi, rdi
-                syscall
-
-                # Invalid instruction on failure to exit
-                ud2
-
-                # Return PID if parent
-                2:
-                ",
-                inout("rax") SYS_CLONE => pid,
-                inout("rdi") flags => _,
-                inout("rsi") stack => _,
-                inout("rdx") 0 => _,
-                inout("r10") 0 => _,
-                inout("r8") 0 => _,
-                //TODO: out("rbx") _,
-                out("rcx") _,
-                out("r9") _,
-                out("r11") _,
-                out("r12") _,
-                out("r13") _,
-                out("r14") _,
-                out("r15") _,
-            );
-        }
-        let tid = e_raw(pid)?;
-
+        let _ = (stack, _os_specific);
+        let tid = Sys::stub("CLONE")?;
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
 
@@ -725,8 +622,8 @@ impl Pal for Sys {
     }
 
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
-        let tgid = Self::getpid();
-        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
+        let _ = (os_tid, signal);
+        Sys::stub("TGKILL").map(|_| ())
     }
 
     fn current_os_tid() -> crate::pthread::OsTid {
@@ -739,49 +636,28 @@ impl Pal for Sys {
         Ok(read_object(fildes as u64, buf).unwrap())
     }
     fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<usize> {
-        e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
+        let _ = (fildes, buf, off);
+        Sys::stub("PREAD64")
     }
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        e_raw(unsafe {
-            syscall!(
-                READLINKAT,
-                AT_FDCWD,
-                pathname.as_ptr(),
-                out.as_mut_ptr(),
-                out.len()
-            )
-        })
+        let _ = (pathname, out);
+        Sys::stub("READLINKAT")
     }
 
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        e_raw(unsafe {
-            syscall!(
-                READLINKAT,
-                dirfd,
-                pathname.as_ptr(),
-                out.as_mut_ptr(),
-                out.len()
-            )
-        })
+        let _ = (dirfd, pathname, out);
+        Sys::stub("READLINKAT")
     }
 
     fn rename(old: CStr, new: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) })
-            .map(|_| ())
+        let _ = (old, new);
+        Sys::stub("RENAMEAT").map(|_| ())
     }
 
     fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                RENAMEAT,
-                old_dir,
-                old_path.as_ptr(),
-                new_dir,
-                new_path.as_ptr()
-            )
-        })
-        .map(|_| ())
+        let _ = (old_dir, old_path, new_dir, new_path);
+        Sys::stub("RENAMEAT").map(|_| ())
     }
 
     fn renameat2(
@@ -791,77 +667,75 @@ impl Pal for Sys {
         new_path: CStr,
         flags: c_uint,
     ) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                RENAMEAT2,
-                old_dir,
-                old_path.as_ptr(),
-                new_dir,
-                new_path.as_ptr(),
-                flags
-            )
-        })
-        .map(|_| ())
+        let _ = (old_dir, old_path, new_dir, new_path, flags);
+        Sys::stub("RENAMEAT2").map(|_| ())
     }
 
     fn rmdir(path: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
+        let _ = path;
+        Sys::stub("UNLINKAT").map(|_| ())
     }
 
     fn sched_yield() -> Result<()> {
-        e_raw(unsafe { syscall!(SCHED_YIELD) }).map(|_| ())
+        Sys::stub("SCHED_YIELD").map(|_| ())
     }
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(SETGROUPS, size, list) }).map(|_| ())
+        let _ = (size, list);
+        Sys::stub("SETGROUPS").map(|_| ())
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(SETPGID, pid, pgid) }).map(|_| ())
+        let _ = (pid, pgid);
+        Sys::stub("SETPGID").map(|_| ())
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(SETPRIORITY, which, who, prio) }).map(|_| ())
+        let _ = (which, who, prio);
+        Sys::stub("SETPRIORITY").map(|_| ())
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }).map(|_| ())
+        let _ = (rgid, egid, sgid);
+        Sys::stub("SETRESGID").map(|_| ())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        e_raw(unsafe { syscall!(SETRESUID, ruid, euid, suid) }).map(|_| ())
+        let _ = (ruid, euid, suid);
+        Sys::stub("SETRESUID").map(|_| ())
     }
 
     fn setsid() -> Result<c_int> {
-        e_raw(unsafe { syscall!(SETSID) }).map(|s| s as c_int)
+        Ok(Sys::stub("SETSID")? as c_int)
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }).map(|_| ())
+        let _ = (path1, path2);
+        Sys::stub("SYMLINKAT").map(|_| ())
     }
 
     fn sync() -> Result<()> {
-        e_raw(unsafe { syscall!(SYNC) }).map(|_| ())
+        Sys::stub("SYNC").map(|_| ())
     }
 
     fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                TIMER_CREATE,
-                clock_id,
-                ptr::addr_of!(evp),
-                timerid.as_mut_ptr()
-            )
-        })
-        .map(|_| ())
+        let _ = (clock_id, evp);
+        if !timerid.as_mut_ptr().is_null() {
+            unsafe {
+                *timerid.as_mut_ptr() = 0;
+            }
+        }
+        Sys::stub("TIMER_CREATE").map(|_| ())
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        e_raw(unsafe { syscall!(TIMER_DELETE, timerid) }).map(|_| ())
+        let _ = timerid;
+        Sys::stub("TIMER_DELETE").map(|_| ())
     }
 
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, value.as_mut_ptr()) }).map(|_| ())
+        let _ = (timerid, value.as_mut_ptr());
+        Sys::stub("TIMER_GETTIME").map(|_| ())
     }
 
     fn timer_settime(
@@ -870,31 +744,23 @@ impl Pal for Sys {
         value: &itimerspec,
         ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                TIMER_SETTIME,
-                timerid,
-                flags,
-                ptr::addr_of!(value),
-                match ovalue {
-                    None => ptr::null_mut(),
-                    Some(mut o) => o.as_mut_ptr(),
-                }
-            )
-        })
-        .map(|_| ())
+        let _ = (timerid, flags, value, ovalue);
+        Sys::stub("TIMER_SETTIME").map(|_| ())
     }
 
     fn umask(mask: mode_t) -> mode_t {
-        unsafe { syscall!(UMASK, mask) as mode_t }
+        let _ = mask;
+        Sys::stub("UMASK").unwrap_or(0) as mode_t
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<()> {
-        e_raw(unsafe { syscall!(UNAME, utsname.as_mut_ptr(), 0) }).map(|_| ())
+        let _ = utsname.as_mut_ptr();
+        Sys::stub("UNAME").map(|_| ())
     }
 
     fn unlink(path: CStr) -> Result<()> {
-        e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
+        let _ = path;
+        Sys::stub("UNLINKAT").map(|_| ())
     }
 
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
@@ -912,7 +778,8 @@ impl Pal for Sys {
     }
 
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
-        e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })
+        let _ = (fildes, buf, off);
+        Sys::stub("PWRITE64")
     }
 
     fn verify() -> bool {

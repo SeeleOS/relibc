@@ -1,66 +1,58 @@
 use crate::{header::signal::sigval, platform::Pal};
-use core::{mem, ptr::addr_of};
+use core::mem;
 
 use super::{
     super::{PalSignal, types::*},
-    Sys, e_raw,
+    Sys,
 };
 use crate::{
     error::{Errno, Result},
     header::{
         bits_time::timespec,
-        signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, stack_t},
+        signal::{SI_QUEUE, sigaction, siginfo_t, sigset_t, stack_t},
         sys_time::itimerval,
     },
 };
 
 impl PalSignal for Sys {
     fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
-        unsafe {
-            e_raw(syscall!(GETITIMER, which, out as *mut _))?;
-        }
-        Ok(())
+        let _ = (which, out);
+        Sys::stub("GETITIMER").map(|_| ())
     }
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(KILL, pid, sig) })?;
-        Ok(())
+        let _ = (pid, sig);
+        Sys::stub("KILL").map(|_| ())
     }
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
-        let info = siginfo_t {
+        let _ = (pid, sig, val);
+        let _info = siginfo_t {
             si_addr: core::ptr::null_mut(),
             si_code: SI_QUEUE,
             si_errno: 0,
-            si_pid: 0, // TODO: GETPID?
+            si_pid: 0,
             si_signo: sig,
             si_status: 0,
-            si_uid: 0, // TODO: GETUID?
+            si_uid: 0,
             si_value: val,
         };
-        e_raw(unsafe { syscall!(RT_SIGQUEUEINFO, pid, sig, addr_of!(info)) }).map(|_| ())
+        Sys::stub("RT_SIGQUEUEINFO").map(|_| ())
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) })?;
-        Ok(())
+        let _ = (pgrp, sig);
+        Sys::stub("KILL").map(|_| ())
     }
 
     fn raise(sig: c_int) -> Result<()> {
-        let tid = e_raw(Sys::gettid() as usize)? as pid_t;
-        e_raw(unsafe { syscall!(TKILL, tid, sig) })?;
-        Ok(())
+        let _ = sig;
+        let _tid = Sys::gettid() as pid_t;
+        Sys::stub("TKILL").map(|_| ())
     }
 
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                SETITIMER,
-                which,
-                new as *const _,
-                old.map_or_else(core::ptr::null_mut, |r| r as *mut _)
-            )
-        })?;
-        Ok(())
+        let _ = (which, new, old);
+        Sys::stub("SETITIMER").map(|_| ())
     }
 
     fn sigaction(
@@ -68,69 +60,31 @@ impl PalSignal for Sys {
         act: Option<&sigaction>,
         oact: Option<&mut sigaction>,
     ) -> Result<(), Errno> {
-        unsafe extern "C" {
-            fn __restore_rt();
-        }
-        let act = act.map(|act| {
-            let mut act_clone = act.clone();
-            act_clone.sa_flags |= SA_RESTORER as c_int;
-            act_clone.sa_restorer = Some(__restore_rt);
-            act_clone
-        });
-        e_raw(unsafe {
-            syscall!(
-                RT_SIGACTION,
-                sig,
-                act.as_ref().map_or_else(core::ptr::null, |x| x as *const _),
-                oact.map_or_else(core::ptr::null_mut, |x| x as *mut _),
-                mem::size_of::<sigset_t>()
-            )
-        })
-        .map(|_| ())
+        let _ = (sig, act, oact);
+        Sys::stub("RT_SIGACTION").map(|_| ())
     }
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()> {
-        e_raw(syscall!(
-            SIGALTSTACK,
-            ss.map_or_else(core::ptr::null, |x| x as *const _),
-            old_ss.map_or_else(core::ptr::null_mut, |x| x as *mut _)
-        ))
-        .map(|_| ())
+        let _ = (ss, old_ss);
+        Sys::stub("SIGALTSTACK").map(|_| ())
     }
 
     fn sigpending(set: &mut sigset_t) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                RT_SIGPENDING,
-                set as *mut sigset_t as usize,
-                mem::size_of::<sigset_t>()
-            )
-        })
-        .map(|_| ())
+        let _ = set;
+        let _sigsetsize = mem::size_of::<sigset_t>();
+        Sys::stub("RT_SIGPENDING").map(|_| ())
     }
 
     fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                RT_SIGPROCMASK,
-                how,
-                set.map_or_else(core::ptr::null, |x| x as *const _),
-                oset.map_or_else(core::ptr::null_mut, |x| x as *mut _),
-                mem::size_of::<sigset_t>()
-            )
-        })
-        .map(|_| ())
+        let _ = (how, set, oset);
+        let _sigsetsize = mem::size_of::<sigset_t>();
+        Sys::stub("RT_SIGPROCMASK").map(|_| ())
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
-        unsafe {
-            e_raw(syscall!(
-                RT_SIGSUSPEND,
-                mask as *const sigset_t,
-                size_of::<sigset_t>()
-            ))
-            .expect_err("must fail")
-        }
+        let _ = mask;
+        let _sigsetsize = size_of::<sigset_t>();
+        Sys::stub("RT_SIGSUSPEND").err().unwrap_or(Errno(0))
     }
 
     fn sigtimedwait(
@@ -138,15 +92,8 @@ impl PalSignal for Sys {
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
     ) -> Result<c_int> {
-        unsafe {
-            e_raw(syscall!(
-                RT_SIGTIMEDWAIT,
-                set as *const _,
-                sig.map_or_else(core::ptr::null_mut, |s| s as *mut _),
-                tp.map_or_else(core::ptr::null, |t| t as *const _),
-                size_of::<sigset_t>()
-            ))
-            .map(|s| s as c_int)
-        }
+        let _ = (set, sig, tp);
+        let _sigsetsize = size_of::<sigset_t>();
+        Ok(Sys::stub("RT_SIGTIMEDWAIT")? as c_int)
     }
 }

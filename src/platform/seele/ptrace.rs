@@ -1,6 +1,6 @@
 use super::{
     super::{PalPtrace, types::*},
-    Sys, e_raw,
+    Sys,
 };
 use crate::error::Result;
 
@@ -11,6 +11,7 @@ impl PalPtrace for Sys {
         addr: *mut c_void,
         data: *mut c_void,
     ) -> Result<c_int> {
-        Ok(unsafe { e_raw(syscall!(PTRACE, request, pid, addr, data))? as c_int })
+        let _ = (request, pid, addr, data);
+        Ok(Sys::stub("PTRACE")? as c_int)
     }
 }

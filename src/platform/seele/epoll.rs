@@ -1,6 +1,6 @@
 use core::mem;
 
-use super::{Sys, e_raw};
+use super::Sys;
 use crate::{
     error::Result,
     header::{signal::sigset_t, sys_epoll::epoll_event},
@@ -9,14 +9,12 @@ use crate::{
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> Result<c_int> {
-        Ok(unsafe { e_raw(syscall!(EPOLL_CREATE1, flags))? as c_int })
+        Ok(Sys::stub("EPOLL_CREATE1")? as c_int)
     }
 
     unsafe fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> Result<()> {
-        unsafe {
-            e_raw(syscall!(EPOLL_CTL, epfd, op, fd, event))?;
-        }
-        Ok(())
+        let _ = (epfd, op, fd, event);
+        Sys::stub("EPOLL_CTL").map(|_| ())
     }
 
     unsafe fn epoll_pwait(
@@ -26,17 +24,8 @@ impl PalEpoll for Sys {
         timeout: c_int,
         sigmask: *const sigset_t,
     ) -> Result<usize> {
-        let sigsetsize: size_t = mem::size_of::<sigset_t>();
-        unsafe {
-            e_raw(syscall!(
-                EPOLL_PWAIT,
-                epfd,
-                events,
-                maxevents,
-                timeout,
-                sigmask,
-                sigsetsize
-            ))
-        }
+        let _ = (epfd, events, maxevents, timeout, sigmask);
+        let _sigsetsize: size_t = mem::size_of::<sigset_t>();
+        Sys::stub("EPOLL_PWAIT")
     }
 }
