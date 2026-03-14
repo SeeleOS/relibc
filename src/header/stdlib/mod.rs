@@ -930,7 +930,7 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
     let r = unsafe { open((b"/scheme/pty\0" as *const u8).cast(), O_CREAT) };
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "seele"))]
     let r = unsafe { open((b"/dev/ptmx\0" as *const u8).cast(), flags) };
 
     if r < 0 && platform::ERRNO.get() == ENOSPC {
@@ -988,7 +988,7 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     platform::ERRNO.get()
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 #[inline(always)]
 unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     let mut pty = 0;

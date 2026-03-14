@@ -20,12 +20,13 @@ mod pal;
 
 pub use self::sys::Sys;
 
+#[cfg(target_os = "seele")]
 #[path = "seele/mod.rs"]
 pub(crate) mod sys;
 
-//#[cfg(target_os = "linux")]
-//#[path = "linux/mod.rs"]
-//pub(crate) mod sys;
+#[cfg(target_os = "linux")]
+#[path = "linux/mod.rs"]
+pub(crate) mod sys;
 
 #[cfg(target_os = "redox")]
 #[path = "redox/mod.rs"]
@@ -34,7 +35,7 @@ pub(crate) mod sys;
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 pub mod auxv_defs;
 
 #[cfg(target_os = "redox")]

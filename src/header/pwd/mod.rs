@@ -20,17 +20,17 @@ use crate::{
     raw_cell::RawCell,
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 mod linux;
 #[cfg(target_os = "redox")]
 mod redox;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 use self::linux as sys;
 #[cfg(target_os = "redox")]
 use self::redox as sys;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 const SEPARATOR: u8 = b':';
 
 #[cfg(target_os = "redox")]

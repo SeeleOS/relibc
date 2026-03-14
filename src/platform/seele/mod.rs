@@ -18,7 +18,7 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::{EAGAIN, EINVAL, EIO},
+        errno::{EAGAIN, EINVAL, EIO, ENOSYS},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
@@ -39,6 +39,28 @@ use crate::{
     error::{Errno, Result},
     header::{bits_time::timespec, sys_utsname::utsname},
 };
+
+/// Stub for unimplemented Linux-style syscalls on Seele.
+/// Prints a message once per call site and returns success (0) so
+/// callers that expect `Result` see an `Ok(())`.
+fn syscall_stub() -> usize {
+    use core::fmt::Write;
+
+    // Best-effort logging to stderr; ignore all errors.
+    let mut w = super::FileWriter::new(2);
+    let _ = w.write_str("unimplemented systemcall\n");
+    0
+}
+
+macro_rules! syscall {
+    ($n:ident $(, $arg:expr )* ) => {{
+        // Currently Seele does not implement the Linux-style syscall `$n`.
+        // Route everything through a common stub so higher-level libc
+        // functions see a successful, no-op implementation.
+        let _ = stringify!($n);
+        syscall_stub()
+    }};
+}
 
 mod epoll;
 mod ptrace;

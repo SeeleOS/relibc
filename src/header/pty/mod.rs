@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 #[path = "linux.rs"]
 mod imp;
 

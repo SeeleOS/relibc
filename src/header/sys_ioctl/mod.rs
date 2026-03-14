@@ -27,10 +27,10 @@ impl winsize {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 pub use self::linux::*;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 pub mod linux;
 
 #[cfg(target_os = "redox")]

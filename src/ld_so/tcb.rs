@@ -6,8 +6,8 @@ use core::{
     ptr, slice,
     sync::atomic::AtomicBool,
 };
-use seele_syslib::syscalls::{self, set_fs};
 use generic_rt::GenericTcb;
+use seele_syslib::syscalls::{self, set_fs};
 
 use crate::{
     header::sys_mman,
@@ -38,7 +38,7 @@ impl Master {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 pub type OsSpecific = ();
 
 #[cfg(target_os = "redox")]
@@ -325,7 +325,7 @@ impl Tcb {
     /// ```
     ///
     /// For x86_64, the ABI page is not used.
-    #[cfg(any(target_os = "linux", target_os = "redox"))]
+    #[cfg(any(target_os = "linux", target_os = "redox", target_os = "seele"))]
     unsafe fn os_new(
         size: usize,
     ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8]), DlError> {
@@ -337,18 +337,18 @@ impl Tcb {
     }
 
     // os_arch_activate for seele
+    #[cfg(target_os = "seele")]
     unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
         set_fs(tls_end as u64).unwrap();
     }
 
-    /// OS and architecture specific code to activate TLS - Linux x86_64
-    //#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    //unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
-    //    const ARCH_SET_FS: usize = 0x1002;
-    //    unsafe {
-    //        syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
-    //   }
-    //}
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
+        const ARCH_SET_FS: usize = 0x1002;
+        unsafe {
+            syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        }
+    }
 
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     unsafe fn os_arch_activate(_os: &(), tls_end: usize, tls_len: usize) {

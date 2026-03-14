@@ -28,7 +28,7 @@ use crate::{
 
 use super::{errno::*, string::strncmp};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "seele"))]
 const SEPARATOR: char = ':';
 
 #[cfg(target_os = "redox")]
