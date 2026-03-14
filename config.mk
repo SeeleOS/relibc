@@ -1,9 +1,16 @@
 ifndef TARGET
 	ifneq ("$(wildcard ../misc/x86_64-seele.json)","")
-		export TARGET:=$(abspath ../misc/x86_64-seele.json)
+		export TARGET:=x86_64-seele
+		export RUST_TARGET_PATH:=$(abspath ../misc)
+		export RUSTFLAGS:=$(RUSTFLAGS) -Z unstable-options
 	else
 		export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
 	endif
+endif
+
+ifeq ($(TARGET),x86_64-seele)
+	export RUSTFLAGS:=$(RUSTFLAGS) -C relocation-model=pic
+	export CPPFLAGS:=$(CPPFLAGS) -fPIC
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)

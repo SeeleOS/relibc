@@ -19,6 +19,22 @@ export CFLAGS=-I$(TARGET_HEADERS)
 
 PROFILE?=release
 
+ifeq ($(TARGET),x86_64-seele)
+LIBS=\
+	$(BUILD)/$(PROFILE)/libc.a \
+	$(BUILD)/$(PROFILE)/crt0.o \
+	$(BUILD)/$(PROFILE)/crti.o \
+	$(BUILD)/$(PROFILE)/crtn.o
+else
+LIBS=\
+	$(BUILD)/$(PROFILE)/libc.a \
+	$(BUILD)/$(PROFILE)/libc.so \
+	$(BUILD)/$(PROFILE)/crt0.o \
+	$(BUILD)/$(PROFILE)/crti.o \
+	$(BUILD)/$(PROFILE)/crtn.o \
+	$(BUILD)/$(PROFILE)/ld_so
+endif
+
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
@@ -65,13 +81,7 @@ install-headers: headers libs
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
 
-libs: \
-	$(BUILD)/$(PROFILE)/libc.a \
-	$(BUILD)/$(PROFILE)/libc.so \
-	$(BUILD)/$(PROFILE)/crt0.o \
-	$(BUILD)/$(PROFILE)/crti.o \
-	$(BUILD)/$(PROFILE)/crtn.o \
-	$(BUILD)/$(PROFILE)/ld_so
+libs: $(LIBS)
 
 install-libs: headers libs
 	mkdir -pv "$(DESTDIR)/lib"

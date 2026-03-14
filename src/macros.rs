@@ -413,7 +413,7 @@ macro_rules! OutProject {
     }
 }
 #[macro_export]
-#[cfg(not(feature = "check_against_libc_crate"))]
+#[cfg(any(not(feature = "check_against_libc_crate"), target_os = "seele"))]
 macro_rules! CheckVsLibcCrate {
     derive() { $(#[$($attrs:meta),*])* $v:vis struct $name:ident {
         $(
@@ -456,7 +456,7 @@ impl LibcTypeEquals<crate::platform::types::c_void, __libc_only_for_layout_check
 /// Derive macro which checks that structs here are defined the same as in the libc crate. Perhaps
 /// not sufficiently rigorous to soundly cast between the types, but should catch most mistakes.
 #[macro_export]
-#[cfg(feature = "check_against_libc_crate")]
+#[cfg(all(feature = "check_against_libc_crate", not(target_os = "seele")))]
 macro_rules! CheckVsLibcCrate {
     // XXX: not sure we can have the name be different from libc::$name without parameters to the
     // derive macro
