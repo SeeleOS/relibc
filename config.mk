@@ -1,5 +1,9 @@
 ifndef TARGET
-	export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+	ifneq ("$(wildcard ../misc/x86_64-seele.json)","")
+		export TARGET:=$(abspath ../misc/x86_64-seele.json)
+	else
+		export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+	endif
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
