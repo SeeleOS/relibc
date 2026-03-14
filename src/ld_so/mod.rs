@@ -133,7 +133,7 @@ pub fn static_init(
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "redox"))]
+#[cfg(any(target_os = "linux", target_os = "redox", target_os = "seele"))]
 pub unsafe fn init(
     sp: &'static Stack,
     #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
