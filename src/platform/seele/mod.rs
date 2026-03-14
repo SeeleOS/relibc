@@ -43,13 +43,13 @@ use crate::{
 /// Stub for unimplemented Linux-style syscalls on Seele.
 /// Prints a message once per call site and returns success (0) so
 /// callers that expect `Result` see an `Ok(())`.
-fn syscall_stub() -> usize {
+fn syscall_stub() -> Result<usize> {
     use core::fmt::Write;
 
     // Best-effort logging to stderr; ignore all errors.
     let mut w = super::FileWriter::new(2);
     let _ = w.write_str("unimplemented systemcall\n");
-    0
+    Ok(0)
 }
 
 mod epoll;
