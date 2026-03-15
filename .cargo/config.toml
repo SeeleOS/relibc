@@ -1,0 +1,3 @@
+[build]
+# 这样你直接运行 `cargo build` 连 --target 都不用打
+target = "x86_64-seele.json"
