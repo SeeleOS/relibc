@@ -13,6 +13,24 @@ pub extern "C" fn __errno() -> *mut c_int {
     __errno_location()
 }
 
+/// POSIX-style accessor used by some libcs / Rust's libc bindings.
+///
+/// relibc historically exported `__errno_location` only; Seele's Rust
+/// std/libc expect `errno_location` instead, so provide a thin wrapper.
+#[unsafe(no_mangle)]
+pub extern "C" fn errno_location() -> *mut c_int {
+    // Debug hook: make it obvious at runtime if the Rust side ends up calling
+    // this compat wrapper instead of using errno via the usual macros.
+    #[cfg(not(test))]
+    {
+        use core::fmt::Write;
+
+        let mut w = platform::FileWriter::new(2);
+        let _ = w.write_str("relibc errno_location() stub called\n");
+    }
+    __errno_location()
+}
+
 /// Provide a pointer to relibc's internal `errno` variable.
 ///
 /// This is the basis of the C-facing macro definition of `errno`, and should
