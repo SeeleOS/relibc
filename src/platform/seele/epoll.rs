@@ -9,7 +9,8 @@ use crate::{
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> Result<c_int> {
-        Ok(Sys::stub("EPOLL_CREATE1")? as c_int)
+        println!("epoll_create1 stub called.");
+        Ok(114514)
     }
 
     unsafe fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> Result<()> {
