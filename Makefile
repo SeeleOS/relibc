@@ -24,7 +24,10 @@ LIBS=\
 	$(BUILD)/$(PROFILE)/libc.a \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
-	$(BUILD)/$(PROFILE)/crtn.o
+	$(BUILD)/$(PROFILE)/crtn.o \
+	$(BUILD)/$(PROFILE)/libm.a \
+	$(BUILD)/$(PROFILE)/librt.a \
+	$(BUILD)/$(PROFILE)/libpthread.a
 else
 LIBS=\
 	$(BUILD)/$(PROFILE)/libc.a \
@@ -146,6 +149,20 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 $(BUILD)/$(PROFILE)/ld_so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.o $(BUILD)/$(PROFILE)/libc.a $(BUILD)/$(PROFILE)/crtn.o
 	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
 	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
+
+ifeq ($(TARGET),x86_64-seele)
+# For Seele we still want the usual libm/librt/libpthread names so that
+# the Rust toolchain can satisfy -lm/-lrt/-lpthread when linking userspace
+# binaries. We only build static variants here.
+$(BUILD)/$(PROFILE)/libm.a: $(BUILD)/openlibm/libopenlibm.a
+	cp $< $@
+
+$(BUILD)/$(PROFILE)/libpthread.a:
+	$(AR) -rcs "$@"
+
+$(BUILD)/$(PROFILE)/librt.a:
+	$(AR) -rcs "$@"
+endif
 
 # Debug targets
 
