@@ -1,7 +1,7 @@
 ifndef TARGET
-	ifneq ("$(wildcard ../misc/x86_64-seele.json)","")
+	ifneq ("$(wildcard ./x86_64-seele.json)","")
 		export TARGET:=x86_64-seele
-		export RUST_TARGET_PATH:=$(abspath ../misc)
+		export RUST_TARGET_PATH:=$(abspath ./)
 		export RUSTFLAGS:=$(RUSTFLAGS) -Z unstable-options
 	else
 		export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
