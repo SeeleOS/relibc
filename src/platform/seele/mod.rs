@@ -166,7 +166,7 @@ impl Pal for Sys {
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
         unsafe {
-            execve(
+            e_raw(process_result(execve(
                 from_utf8(slice::from_raw_parts(
                     path.as_ptr() as *const u8,
                     path.len(),
@@ -174,8 +174,7 @@ impl Pal for Sys {
                 .unwrap(),
                 argv,
                 envp,
-            )
-            .unwrap()
+            )))?
         };
         unreachable!()
     }
