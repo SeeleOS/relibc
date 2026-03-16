@@ -345,15 +345,15 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        Sys::stub("GETEGID").unwrap_or(0) as gid_t
+        0
     }
 
     fn geteuid() -> uid_t {
-        Sys::stub("GETEUID").unwrap_or(0) as uid_t
+        0
     }
 
     fn getgid() -> gid_t {
-        Sys::stub("GETGID").unwrap_or(0) as gid_t
+        0
     }
 
     fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
@@ -436,7 +436,7 @@ impl Pal for Sys {
     }
 
     fn getuid() -> uid_t {
-        Sys::stub("GETUID").unwrap_or(0) as uid_t
+        0
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
