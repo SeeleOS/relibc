@@ -302,8 +302,7 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        futex::wait(addr, u64::from(val)).unwrap();
-        Ok(())
+        e_raw(process_result(futex::wait(addr, u64::from(val)))).map(|_| ())
     }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
