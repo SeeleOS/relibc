@@ -764,7 +764,12 @@ impl Pal for Sys {
 
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
         let status_ptr = stat_loc.map_or(core::ptr::null_mut(), |mut o| o.as_mut_ptr());
-        e_raw(process_result(wait_for_process_exit(pid, status_ptr))).map(|p| p as pid_t)
+        loop {
+            match e_raw(process_result(wait_for_process_exit(pid, status_ptr))) {
+                Err(Errno(EAGAIN)) => continue,
+                other => return other.map(|p| p as pid_t),
+            }
+        }
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
