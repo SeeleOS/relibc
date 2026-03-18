@@ -2,7 +2,7 @@ use alloc::{slice, str};
 use seele_syslib::{
     syscalls::{
         self, allocate_mem, execve,
-        filesystem::{change_dir, file_info, get_current_directory, open_file},
+        filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
         futex, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
         wait_for_process_exit,
@@ -330,8 +330,11 @@ impl Pal for Sys {
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize> {
-        let _ = (fd, buf);
-        Sys::stub("GETDENTS64")
+        e_raw(process_result(directory_contents(
+            fd as u64,
+            buf.as_mut_ptr(),
+            buf.len() as u64,
+        )))
     }
     fn dir_seek(fd: c_int, off: u64) -> Result<()> {
         let _ = (fd, off);
