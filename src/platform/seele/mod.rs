@@ -94,7 +94,12 @@ impl Sys {
 
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
         // TODO: Somehow support varargs to syscall??
-        Ok(configurate_object(fd as u64, request, out as *mut u8).unwrap() as i32)
+        e_raw(process_result(configurate_object(
+            fd as u64,
+            request,
+            out as *mut u8,
+        )))
+        .map(|i| i as c_int)
     }
 
     // fn times(out: *mut tms) -> clock_t {
@@ -282,7 +287,7 @@ impl Pal for Sys {
     }
 
     unsafe fn fork() -> Result<pid_t> {
-        Ok(syscalls::fork().unwrap() as i32)
+        e_raw(process_result(syscalls::fork())).map(|i| i as pid_t)
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
@@ -306,7 +311,7 @@ impl Pal for Sys {
     }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
-        Ok(futex::wake(addr, u64::from(num)).unwrap() as u32)
+        e_raw(process_result(futex::wake(addr, u64::from(num)))).map(|i| i as u32)
     }
 
     unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
@@ -634,7 +639,7 @@ impl Pal for Sys {
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
-        Ok(read_object(fildes as u64, buf).unwrap())
+        e_raw(process_result(read_object(fildes as u64, buf)))
     }
     fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<usize> {
         let _ = (fildes, buf, off);
@@ -775,7 +780,7 @@ impl Pal for Sys {
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
-        Ok(write_object(fildes as u64, buf).unwrap())
+        e_raw(process_result(write_object(fildes as u64, buf)))
     }
 
     fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
