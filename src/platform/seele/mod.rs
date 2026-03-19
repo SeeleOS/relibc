@@ -3,7 +3,7 @@ use seele_syslib::{
     syscalls::{
         self, allocate_mem, execve,
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
-        futex, get_thread_id,
+        futex, get_process_id, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
         wait_for_process_exit,
     },
@@ -89,7 +89,7 @@ impl Sys {
         // Best-effort logging to stderr; ignore all errors.
         let mut w = super::FileWriter::new(2);
         let _ = w.write_fmt(format_args!("unimplemented systemcall {name}\n"));
-        Ok(0)
+        Err(Errno(38))
     }
 
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
@@ -372,7 +372,7 @@ impl Pal for Sys {
     }
 
     fn getpid() -> pid_t {
-        Sys::stub("GETPID").unwrap_or(0) as pid_t
+        get_process_id().unwrap() as i32
     }
 
     fn getppid() -> pid_t {
