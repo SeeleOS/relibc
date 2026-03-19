@@ -83,9 +83,8 @@ impl PalSignal for Sys {
     }
 
     fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<()> {
-        let _ = (how, set, oset);
         let _sigsetsize = mem::size_of::<sigset_t>();
-        Sys::stub("RT_SIGPROCMASK").map(|_| ())
+        Sys::sigprocmask_stub(how, set, oset)
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {

@@ -4,7 +4,9 @@ use seele_syslib::{
         self, allocate_mem, execve,
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
         futex, get_process_id, get_process_parent_id, get_thread_id,
-        object::{configurate_object, read_object, remove_object, write_object},
+        object::{
+            Command, configurate_object, control_object, read_object, remove_object, write_object,
+        },
         wait_for_process_exit,
     },
     utils::process_result,
@@ -17,7 +19,7 @@ use crate::{
         dirent::dirent,
         errno::{EAGAIN, EINVAL, EIO, ENOSYS},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
-        signal::{SIGCHLD, sigevent},
+        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
@@ -30,7 +32,12 @@ use crate::{
     out::Out,
     pthread::set_cancel_state,
 };
-use core::{num::NonZeroU64, ptr, str::from_utf8};
+use core::{
+    num::NonZeroU64,
+    ptr,
+    str::from_utf8,
+    sync::atomic::{AtomicU64, Ordering},
+};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
@@ -48,6 +55,7 @@ const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
 const CLONE_SIGHAND: usize = 0x0800;
 const CLONE_THREAD: usize = 0x00010000;
+static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
 
 #[repr(C)]
 #[derive(Default)]
@@ -105,6 +113,39 @@ impl Sys {
     // fn times(out: *mut tms) -> clock_t {
     //     unsafe { syscall!(TIMES, out) as clock_t }
     // }
+
+    pub(crate) fn sigprocmask_stub(
+        how: c_int,
+        set: Option<&sigset_t>,
+        oset: Option<&mut sigset_t>,
+    ) -> Result<()> {
+        use core::fmt::Write;
+
+        let old = SIGPROCMASK_STATE.load(Ordering::SeqCst);
+
+        if let Some(oset) = oset {
+            *oset = old;
+        }
+
+        let Some(set) = set else {
+            return Ok(());
+        };
+
+        let new = match how {
+            SIG_BLOCK => old | *set,
+            SIG_UNBLOCK => old & !*set,
+            SIG_SETMASK => *set,
+            _ => return Err(Errno(EINVAL)),
+        };
+
+        let mut w = super::FileWriter::new(2);
+        let _ = w.write_fmt(format_args!(
+            "stub RT_SIGPROCMASK how={how} old=0x{old:016x} set=0x{set:016x} new=0x{new:016x}\n"
+        ));
+
+        SIGPROCMASK_STATE.store(new, Ordering::SeqCst);
+        Ok(())
+    }
 }
 
 impl Pal for Sys {
@@ -282,8 +323,12 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
-        let _ = (fildes, cmd, arg);
-        Ok(Sys::stub("FCNTL")? as c_int)
+        e_raw(process_result(control_object(
+            fildes as u64,
+            Command::from(cmd),
+            arg,
+        )))
+        .map(|f| f as c_int)
     }
 
     unsafe fn fork() -> Result<pid_t> {
