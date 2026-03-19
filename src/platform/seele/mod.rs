@@ -3,7 +3,7 @@ use seele_syslib::{
     syscalls::{
         self, allocate_mem, execve,
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
-        futex, get_process_id, get_thread_id,
+        futex, get_process_id, get_process_parent_id, get_thread_id,
         object::{configurate_object, read_object, remove_object, write_object},
         wait_for_process_exit,
     },
@@ -24,7 +24,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         time::itimerspec,
-        unistd::{SEEK_CUR, SEEK_SET},
+        unistd::{SEEK_CUR, SEEK_SET, getpid},
     },
     ld_so::tcb::OsSpecific,
     out::Out,
@@ -367,8 +367,8 @@ impl Pal for Sys {
     }
 
     fn getpgid(pid: pid_t) -> Result<pid_t> {
-        let _ = pid;
-        Ok(Sys::stub("GETPGID")? as pid_t)
+        // TODO
+        Ok(getpid())
     }
 
     fn getpid() -> pid_t {
@@ -376,7 +376,7 @@ impl Pal for Sys {
     }
 
     fn getppid() -> pid_t {
-        Sys::stub("GETPPID").unwrap_or(0) as pid_t
+        get_process_parent_id().unwrap() as i32
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
