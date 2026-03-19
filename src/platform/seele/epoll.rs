@@ -39,6 +39,7 @@ impl PalEpoll for Sys {
                 }
 
                 let event_bits = unsafe { (*event).events };
+                let event_data = unsafe { (*event).data.u64 };
                 if op == EPOLL_CTL_MOD {
                     for poll_event in epoll_bits_to_poll_events(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP)
                         .into_iter()
@@ -57,6 +58,7 @@ impl PalEpoll for Sys {
                         epfd as u64,
                         fd as u64,
                         poll_event,
+                        event_data,
                     )))?;
                 }
 
