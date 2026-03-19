@@ -55,6 +55,7 @@ const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
 const CLONE_SIGHAND: usize = 0x0800;
 const CLONE_THREAD: usize = 0x00010000;
+const PRINT_STUB_MESSAGE: bool = false;
 static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
 
 #[repr(C)]
@@ -89,14 +90,21 @@ pub fn e_raw(sys: usize) -> Result<usize> {
 pub struct Sys;
 
 impl Sys {
+    fn print_stub_message(args: core::fmt::Arguments<'_>) {
+        use core::fmt::Write;
+
+        if !PRINT_STUB_MESSAGE {
+            return;
+        }
+
+        let mut w = super::FileWriter::new(2);
+        let _ = w.write_fmt(args);
+    }
+
     /// Stub for unimplemented Linux-style syscalls on Seele.
     /// Prints a message and returns Ok(0) to indicate a no-op success.
     pub(crate) fn stub(name: &str) -> Result<usize> {
-        use core::fmt::Write;
-
-        // Best-effort logging to stderr; ignore all errors.
-        let mut w = super::FileWriter::new(2);
-        let _ = w.write_fmt(format_args!("unimplemented systemcall {name}\n"));
+        Self::print_stub_message(format_args!("unimplemented systemcall {name}\n"));
         Err(Errno(38))
     }
 
@@ -119,8 +127,6 @@ impl Sys {
         set: Option<&sigset_t>,
         oset: Option<&mut sigset_t>,
     ) -> Result<()> {
-        use core::fmt::Write;
-
         let old = SIGPROCMASK_STATE.load(Ordering::SeqCst);
 
         if let Some(oset) = oset {
@@ -138,8 +144,7 @@ impl Sys {
             _ => return Err(Errno(EINVAL)),
         };
 
-        let mut w = super::FileWriter::new(2);
-        let _ = w.write_fmt(format_args!(
+        Self::print_stub_message(format_args!(
             "stub RT_SIGPROCMASK how={how} old=0x{old:016x} set=0x{set:016x} new=0x{new:016x}\n"
         ));
 
