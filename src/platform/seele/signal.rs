@@ -1,4 +1,7 @@
-use crate::{header::signal::sigval, platform::Pal};
+use crate::{
+    header::signal::sigval,
+    platform::{Pal, sys::e_raw},
+};
 use core::mem;
 
 use super::{
@@ -61,7 +64,11 @@ impl PalSignal for Sys {
         oact: Option<&mut sigaction>,
     ) -> Result<(), Errno> {
         let _ = (sig, act, oact);
-        Sys::stub("RT_SIGACTION").map(|_| ())
+        if sig == 9 || sig == 19 {
+            return Err(Errno(22));
+        }
+
+        Ok(())
     }
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()> {
