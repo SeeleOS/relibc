@@ -323,12 +323,8 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
-        e_raw(process_result(control_object(
-            fildes as u64,
-            Command::from(cmd),
-            arg,
-        )))
-        .map(|f| f as c_int)
+        let command = Command::from_linux(cmd).ok_or(Errno(EINVAL))?;
+        e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
     }
 
     unsafe fn fork() -> Result<pid_t> {
