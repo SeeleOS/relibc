@@ -100,14 +100,18 @@ impl self::termios {
 
     /// convert [`self`] to a [`SeeleTerminalInfo`], with an existing [`SeeleTerminalInfo`]
     pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
-        let echo = self.c_lflag & (ECHO | ECHOE | ECHOK | ECHONL) as u32 != 0;
+        let echo = self.c_lflag & ECHO as u32 != 0;
         let raw = self.c_lflag & ICANON as u32 == 0;
+        let echo_newline = echo || self.c_lflag & ECHONL as u32 != 0;
+        let echo_delete = self.c_lflag & (ECHO | ECHOE) as u32 == (ECHO | ECHOE) as u32;
 
         SeeleTerminalInfo {
             rows: current.rows,
             cols: current.cols,
             echo,
             raw,
+            echo_newline,
+            echo_delete,
         }
     }
 }
@@ -121,9 +125,21 @@ impl From<SeeleTerminalInfo> for termios {
         }
 
         if terminal_info.echo {
-            termios.c_lflag |= (ECHO | ECHOE | ECHOK | ECHONL) as u32;
+            termios.c_lflag |= ECHO as u32;
         } else {
-            termios.c_lflag &= !((ECHO | ECHOE | ECHOK | ECHONL) as u32);
+            termios.c_lflag &= !(ECHO as u32);
+        }
+
+        if terminal_info.echo_newline {
+            termios.c_lflag |= ECHONL as u32;
+        } else {
+            termios.c_lflag &= !(ECHONL as u32);
+        }
+
+        if terminal_info.echo_delete {
+            termios.c_lflag |= ECHOE as u32;
+        } else {
+            termios.c_lflag &= !(ECHOE as u32);
         }
 
         termios
