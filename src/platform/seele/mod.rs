@@ -5,7 +5,8 @@ use seele_syslib::{
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
         futex, get_process_id, get_process_parent_id, get_thread_id,
         object::{
-            Command, configurate_object, control_object, read_object, remove_object, write_object,
+            Command, TerminalInfo as SeeleTerminalInfo, configurate_object, control_object,
+            get_terminal_info, read_object, remove_object, set_terminal_info, write_object,
         },
         wait_for_process_exit,
     },
@@ -20,11 +21,13 @@ use crate::{
         errno::{EAGAIN, EINVAL, EIO, ENOSYS},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
+        sys_ioctl::{TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize},
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
+        termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET, getpid},
     },
@@ -109,13 +112,56 @@ impl Sys {
     }
 
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
-        // TODO: Somehow support varargs to syscall??
-        e_raw(process_result(configurate_object(
-            fd as u64,
-            request,
-            out as *mut u8,
-        )))
-        .map(|i| i as c_int)
+        match request {
+            TCGETS => {
+                // Makes a new blank Seele terminal info
+                let mut info = SeeleTerminalInfo::default();
+                // Writes the actual seele terminal info to it
+                e_raw(process_result(get_terminal_info(fd as u64, &mut info)))?;
+
+                if !out.is_null() {
+                    // Updates the termios with the seele term info
+                    unsafe { &mut *out.cast::<termios>() }.update_from_seele(info);
+                }
+
+                Ok(0)
+            }
+            TCSETS | TCSETSW | TCSETSF => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+
+                // Gets the current terminal info
+                let mut current = SeeleTerminalInfo::default();
+                e_raw(process_result(get_terminal_info(fd as u64, &mut current)))?;
+
+                // Casts the termios as seele terminal info
+                let new_info = (unsafe { &*out.cast::<termios>() }).as_seele_terminal_info(current);
+                // Sets the terminal info as the termios (changed to seele terminal info)
+                e_raw(process_result(set_terminal_info(fd as u64, &new_info)))?;
+                Ok(0)
+            }
+            TIOCGWINSZ => {
+                let mut info = SeeleTerminalInfo::default();
+                e_raw(process_result(get_terminal_info(fd as u64, &mut info)))?;
+
+                if !out.is_null() {
+                    let out = unsafe { &mut *out.cast::<winsize>() };
+                    out.ws_row = info.rows as u16;
+                    out.ws_col = info.cols as u16;
+                    out.ws_xpixel = 0;
+                    out.ws_ypixel = 0;
+                }
+
+                Ok(0)
+            }
+            _ => e_raw(process_result(configurate_object(
+                fd as u64,
+                request,
+                out as *mut u8,
+            )))
+            .map(|i| i as c_int),
+        }
     }
 
     // fn times(out: *mut tms) -> clock_t {

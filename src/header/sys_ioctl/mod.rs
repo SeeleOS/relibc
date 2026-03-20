@@ -15,10 +15,10 @@ pub struct sgttyb {
 #[repr(C)]
 #[derive(Default)]
 pub struct winsize {
-    ws_row: c_ushort,
-    ws_col: c_ushort,
-    ws_xpixel: c_ushort,
-    ws_ypixel: c_ushort,
+    pub ws_row: c_ushort,
+    pub ws_col: c_ushort,
+    pub ws_xpixel: c_ushort,
+    pub ws_ypixel: c_ushort,
 }
 
 impl winsize {

@@ -2,6 +2,8 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
 
+use seele_syslib::syscalls::object::TerminalInfo as SeeleTerminalInfo;
+
 use crate::{
     header::{
         errno,
@@ -53,6 +55,36 @@ pub struct termios {
     pub c_cc: [cc_t; NCCS],
     pub __c_ispeed: speed_t,
     pub __c_ospeed: speed_t,
+}
+
+impl self::termios {
+    /// convert [`self`] to a [`SeeleTerminalInfo`], with an existing [`SeeleTerminalInfo`]
+    pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
+        let echo = self.c_lflag & (ECHO | ECHOE | ECHOK | ECHONL) as u32 != 0;
+        let raw = self.c_lflag & ICANON as u32 == 0;
+
+        SeeleTerminalInfo {
+            rows: current.rows,
+            cols: current.cols,
+            echo,
+            raw,
+        }
+    }
+
+    /// Update the state of [`self`] from [`SeeleTerminalInfo`]
+    pub fn update_from_seele(&mut self, terminal_info: SeeleTerminalInfo) {
+        if terminal_info.raw {
+            self.c_lflag &= !(ICANON as u32);
+        } else {
+            self.c_lflag |= ICANON as u32;
+        }
+
+        if terminal_info.echo {
+            self.c_lflag |= (ECHO | ECHOE | ECHOK | ECHONL) as u32;
+        } else {
+            self.c_lflag &= !((ECHO | ECHOE | ECHOK | ECHONL) as u32);
+        }
+    }
 }
 
 // Must match structure in redox_termios
