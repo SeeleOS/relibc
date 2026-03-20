@@ -110,7 +110,7 @@ impl self::termios {
     /// convert [`self`] to a [`SeeleTerminalInfo`], with an existing [`SeeleTerminalInfo`]
     pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
         let echo = self.c_lflag & ECHO as u32 != 0;
-        let raw = self.c_lflag & ICANON as u32 == 0;
+        let canonical = self.c_lflag & ICANON as u32 != 0;
         let echo_newline = echo || self.c_lflag & ECHONL as u32 != 0;
         let echo_delete = self.c_lflag & (ECHO | ECHOE) as u32 == (ECHO | ECHOE) as u32;
 
@@ -118,7 +118,7 @@ impl self::termios {
             rows: current.rows,
             cols: current.cols,
             echo,
-            raw,
+            canonical,
             echo_newline,
             echo_delete,
         }
@@ -129,7 +129,7 @@ impl From<SeeleTerminalInfo> for termios {
     fn from(terminal_info: SeeleTerminalInfo) -> Self {
         let mut termios = termios::sane_defaults();
 
-        if terminal_info.raw {
+        if !terminal_info.canonical {
             termios.set_noncanonical_mode();
         }
 
