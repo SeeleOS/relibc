@@ -296,7 +296,7 @@ pub unsafe extern "C" fn execl(
     mut __valist: ...
 ) -> c_int {
     unsafe {
-        with_argv(__valist, arg0, |args, _remaining_va| {
+        with_argv(__valist.as_va_list(), arg0, |args, _remaining_va| {
             execv(path, args.as_ptr().cast())
         })
     }
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn execle(
     mut __valist: ...
 ) -> c_int {
     unsafe {
-        with_argv(__valist, arg0, |args, mut remaining_va| {
+        with_argv(__valist.as_va_list(), arg0, |args, mut remaining_va| {
             let envp = remaining_va.arg::<*const *mut c_char>();
             execve(path, args.as_ptr().cast(), envp)
         })
@@ -325,7 +325,7 @@ pub unsafe extern "C" fn execlp(
     mut __valist: ...
 ) -> c_int {
     unsafe {
-        with_argv(__valist, arg0, |args, _remaining_va| {
+        with_argv(__valist.as_va_list(), arg0, |args, _remaining_va| {
             execvp(file, args.as_ptr().cast())
         })
     }
