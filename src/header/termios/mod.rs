@@ -98,6 +98,15 @@ impl self::termios {
         self.c_cc[VTIME] = 0;
     }
 
+    fn set_noncanonical_mode(&mut self) {
+        // Seele currently only tracks whether line discipline is canonical.
+        // Do not expand that into full cfmakeraw()-style semantics on tcgetattr,
+        // or readline/bash will observe a tty state they never actually asked for.
+        self.c_lflag &= !(ICANON as u32);
+        self.c_cc[VMIN] = 1;
+        self.c_cc[VTIME] = 0;
+    }
+
     /// convert [`self`] to a [`SeeleTerminalInfo`], with an existing [`SeeleTerminalInfo`]
     pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
         let echo = self.c_lflag & ECHO as u32 != 0;
@@ -121,7 +130,7 @@ impl From<SeeleTerminalInfo> for termios {
         let mut termios = termios::sane_defaults();
 
         if terminal_info.raw {
-            termios.set_raw_mode();
+            termios.set_noncanonical_mode();
         }
 
         if terminal_info.echo {
