@@ -121,7 +121,7 @@ impl Sys {
 
                 if !out.is_null() {
                     // Updates the termios with the seele term info
-                    unsafe { &mut *out.cast::<termios>() }.update_from_seele(info);
+                    *(unsafe { &mut *out.cast::<termios>() }) = termios::from(info);
                 }
 
                 Ok(0)

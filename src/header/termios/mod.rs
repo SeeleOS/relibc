@@ -58,6 +58,46 @@ pub struct termios {
 }
 
 impl self::termios {
+    fn sane_defaults() -> Self {
+        let mut termios = Self {
+            c_iflag: (ICRNL | IXON) as u32,
+            c_oflag: (OPOST | ONLCR) as u32,
+            c_cflag: (B38400 | CS8 | CREAD | HUPCL) as u32,
+            c_lflag: (ISIG | ICANON | ECHO | ECHOE | ECHOK | IEXTEN) as u32,
+            c_line: 0,
+            c_cc: [_POSIX_VDISABLE; NCCS],
+            __c_ispeed: B38400 as u32,
+            __c_ospeed: B38400 as u32,
+        };
+
+        termios.c_cc[VINTR] = 3;
+        termios.c_cc[VQUIT] = 28;
+        termios.c_cc[VERASE] = 127;
+        termios.c_cc[VKILL] = 21;
+        termios.c_cc[VEOF] = 4;
+        termios.c_cc[VMIN] = 1;
+        termios.c_cc[VTIME] = 0;
+        termios.c_cc[VSTART] = 17;
+        termios.c_cc[VSTOP] = 19;
+        termios.c_cc[VSUSP] = 26;
+        termios.c_cc[VREPRINT] = 18;
+        termios.c_cc[VDISCARD] = 15;
+        termios.c_cc[VWERASE] = 23;
+        termios.c_cc[VLNEXT] = 22;
+
+        termios
+    }
+
+    fn set_raw_mode(&mut self) {
+        self.c_iflag &= !(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON) as u32;
+        self.c_oflag &= !(OPOST as u32);
+        self.c_lflag &= !(ECHO | ECHONL | ICANON | ISIG | IEXTEN) as u32;
+        self.c_cflag &= !((CSIZE | PARENB) as u32);
+        self.c_cflag |= CS8 as u32;
+        self.c_cc[VMIN] = 1;
+        self.c_cc[VTIME] = 0;
+    }
+
     /// convert [`self`] to a [`SeeleTerminalInfo`], with an existing [`SeeleTerminalInfo`]
     pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
         let echo = self.c_lflag & (ECHO | ECHOE | ECHOK | ECHONL) as u32 != 0;
@@ -70,20 +110,23 @@ impl self::termios {
             raw,
         }
     }
+}
 
-    /// Update the state of [`self`] from [`SeeleTerminalInfo`]
-    pub fn update_from_seele(&mut self, terminal_info: SeeleTerminalInfo) {
+impl From<SeeleTerminalInfo> for termios {
+    fn from(terminal_info: SeeleTerminalInfo) -> Self {
+        let mut termios = termios::sane_defaults();
+
         if terminal_info.raw {
-            self.c_lflag &= !(ICANON as u32);
-        } else {
-            self.c_lflag |= ICANON as u32;
+            termios.set_raw_mode();
         }
 
         if terminal_info.echo {
-            self.c_lflag |= (ECHO | ECHOE | ECHOK | ECHONL) as u32;
+            termios.c_lflag |= (ECHO | ECHOE | ECHOK | ECHONL) as u32;
         } else {
-            self.c_lflag &= !((ECHO | ECHOE | ECHOK | ECHONL) as u32);
+            termios.c_lflag &= !((ECHO | ECHOE | ECHOK | ECHONL) as u32);
         }
+
+        termios
     }
 }
 
