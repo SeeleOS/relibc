@@ -155,6 +155,21 @@ impl Sys {
 
                 Ok(0)
             }
+            TIOCSWINSZ => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+
+                let size = unsafe { &*out.cast::<winsize>() };
+                let mut info = SeeleTerminalInfo::default();
+                e_raw(process_result(get_terminal_info(fd as u64, &mut info)))?;
+
+                info.rows = u64::from(size.ws_row);
+                info.cols = u64::from(size.ws_col);
+                e_raw(process_result(set_terminal_info(fd as u64, &info)))?;
+
+                Ok(0)
+            }
             _ => e_raw(process_result(configurate_object(
                 fd as u64,
                 request,
