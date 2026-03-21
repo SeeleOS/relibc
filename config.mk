@@ -8,6 +8,10 @@ ifndef TARGET
 	endif
 endif
 
+ifneq ($(filter %-seele,$(TARGET)),)
+	export DESTDIR ?= ../sysroot/misc/libs
+endif
+
 ifeq ($(TARGET),x86_64-seele)
 	export RUSTFLAGS:=$(RUSTFLAGS) -C relocation-model=pic
 	export CPPFLAGS:=$(CPPFLAGS) -fPIC
