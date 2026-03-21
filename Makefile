@@ -81,12 +81,29 @@ fmt:
 	./fmt.sh
 
 install-headers: headers libs
+ifneq ($(filter %-seele,$(TARGET)),)
+	mkdir -pv "$(DESTDIR)/system_include"
+	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/system_include"
+else
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
+endif
 
 libs: $(LIBS)
 
 install-libs: headers libs
+ifneq ($(filter %-seele,$(TARGET)),)
+	mkdir -pv "$(DESTDIR)/system_lib"
+	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/system_lib"
+	cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/system_lib"
+	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/system_lib"
+	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/system_lib"
+	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/system_lib/libm.a"
+	# Empty libraries for dl, pthread, and rt
+	$(AR) -rcs "$(DESTDIR)/system_lib/libdl.a"
+	$(AR) -rcs "$(DESTDIR)/system_lib/libpthread.a"
+	$(AR) -rcs "$(DESTDIR)/system_lib/librt.a"
+else
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/lib"
@@ -101,6 +118,7 @@ install-libs: headers libs
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
+endif
 
 install-tests: tests
 	$(MAKE) -C tests
