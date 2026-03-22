@@ -1,7 +1,9 @@
 use alloc::vec;
 use core::mem;
 use seele_sys::{
-    syscalls::polling::{PollEvent, PollResult, create_poller, poller_add, poller_remove, poller_wait},
+    syscalls::polling::{
+        PollEvent, PollResult, create_poller, poller_add, poller_remove, poller_wait,
+    },
     utils::process_result,
 };
 
@@ -11,7 +13,10 @@ use crate::{
     header::{
         errno::EINVAL,
         signal::sigset_t,
-        sys_epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, epoll_event},
+        sys_epoll::{
+            EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT,
+            epoll_event,
+        },
     },
     platform::{PalEpoll, types::*},
 };
@@ -41,9 +46,10 @@ impl PalEpoll for Sys {
                 let event_bits = unsafe { (*event).events };
                 let event_data = unsafe { (*event).data.u64 };
                 if op == EPOLL_CTL_MOD {
-                    for poll_event in epoll_bits_to_poll_events(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP)
-                        .into_iter()
-                        .flatten()
+                    for poll_event in
+                        epoll_bits_to_poll_events(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP)
+                            .into_iter()
+                            .flatten()
                     {
                         let _ = super::e_raw(process_result(poller_remove(
                             epfd as u64,
@@ -65,9 +71,10 @@ impl PalEpoll for Sys {
                 Ok(())
             }
             EPOLL_CTL_DEL => {
-                for poll_event in epoll_bits_to_poll_events(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP)
-                    .into_iter()
-                    .flatten()
+                for poll_event in
+                    epoll_bits_to_poll_events(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP)
+                        .into_iter()
+                        .flatten()
                 {
                     let _ = super::e_raw(process_result(poller_remove(
                         epfd as u64,
@@ -101,15 +108,14 @@ impl PalEpoll for Sys {
             epfd as u64,
             poll_results.as_mut_ptr(),
             maxevents as usize,
+            timeout,
         )))?;
 
         for (index, result) in poll_results.into_iter().take(count).enumerate() {
             unsafe {
                 events.add(index).write(epoll_event {
                     events: result.events,
-                    data: crate::header::sys_epoll::epoll_data {
-                        u64: result.data,
-                    },
+                    data: crate::header::sys_epoll::epoll_data { u64: result.data },
                 });
             }
         }
