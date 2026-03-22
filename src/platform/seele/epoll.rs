@@ -1,6 +1,6 @@
 use alloc::vec;
 use core::mem;
-use seele_syslib::{
+use seele_sys::{
     syscalls::polling::{PollEvent, PollResult, create_poller, poller_add, poller_remove, poller_wait},
     utils::process_result,
 };

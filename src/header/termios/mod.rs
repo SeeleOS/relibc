@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/termios.h.html>.
 
-use seele_syslib::syscalls::object::TerminalInfo as SeeleTerminalInfo;
+use seele_sys::syscalls::object::TerminalInfo as SeeleTerminalInfo;
 
 use crate::{
     header::{

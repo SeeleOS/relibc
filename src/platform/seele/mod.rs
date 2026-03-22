@@ -1,5 +1,5 @@
 use alloc::{slice, str};
-use seele_syslib::{
+use seele_sys::{
     syscalls::{
         self, allocate_mem, execve,
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},

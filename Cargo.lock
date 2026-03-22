@@ -761,7 +761,7 @@ dependencies = [
  "redox_syscall",
  "sc",
  "scrypt",
- "seele-syslib",
+ "seele-sys",
  "sha-crypt",
  "sha2",
  "spin",
@@ -835,7 +835,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "seele-syslib"
+name = "seele-sys"
 version = "0.1.8"
 dependencies = [
  "cbindgen",

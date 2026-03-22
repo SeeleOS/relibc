@@ -7,7 +7,7 @@ use core::{
     sync::atomic::AtomicBool,
 };
 use generic_rt::GenericTcb;
-use seele_syslib::syscalls::{self, set_fs};
+use seele_sys::syscalls::{self, set_fs};
 
 use crate::{
     header::sys_mman,
