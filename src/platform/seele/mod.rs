@@ -5,8 +5,9 @@ use seele_sys::{
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
         futex, get_process_id, get_process_parent_id, get_thread_id,
         object::{
-            Command, TerminalInfo as SeeleTerminalInfo, configurate_object, control_object,
-            get_terminal_info, read_object, remove_object, set_terminal_info, write_object,
+            Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
+            configurate_object, control_object, get_terminal_info, read_object, remove_object,
+            set_terminal_info, write_object,
         },
         wait_for_process_exit,
     },
@@ -267,13 +268,15 @@ impl Pal for Sys {
     }
 
     fn dup(fildes: c_int) -> Result<c_int> {
-        let _ = fildes;
-        Ok(Sys::stub("DUP")? as c_int)
+        e_raw(process_result(clone_object(fildes as u64))).map(|f| f as c_int)
     }
 
     fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int> {
-        let _ = (fildes, fildes2);
-        Ok(Sys::stub("DUP3")? as c_int)
+        e_raw(process_result(clone_object_to(
+            fildes as u64,
+            fildes2 as u64,
+        )))
+        .map(|f| f as c_int)
     }
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
