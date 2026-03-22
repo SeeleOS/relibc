@@ -50,7 +50,7 @@ BUILTINS_VERSION=0.1.70
 
 .PHONY: all clean fmt install install-libs install-headers install-tests libs headers submodules test
 
-all: | headers libs
+all: | headers libs install
 
 headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
