@@ -120,12 +120,15 @@ else
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 endif
 
+mount:
+	sudo mount ../disk.img ../sysroot
+
 install-tests: tests
 	$(MAKE) -C tests
 	mkdir -p "$(DESTDIR)/bin/relibc-tests"
 	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
 
-install: install-headers install-libs
+install: mount install-headers install-libs
 
 submodules:
 	git submodule sync
