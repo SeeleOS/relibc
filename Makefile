@@ -121,7 +121,7 @@ else
 endif
 
 mount:
-	sudo mount ../disk.img ../sysroot
+	-sudo mount ../disk.img ../sysroot
 
 install-tests: tests
 	$(MAKE) -C tests
