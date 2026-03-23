@@ -20,7 +20,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EAGAIN, EINVAL, EIO, ENOSYS},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize},
         sys_resource::{rlimit, rusage},
@@ -680,7 +680,11 @@ impl Pal for Sys {
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
-        e_raw(process_result(open_file(path.as_ptr()))).map(|fd| fd as c_int)
+        e_raw(process_result(open_file(
+            path.as_ptr(),
+            (oflag & O_CREAT) != 0,
+        )))
+        .map(|fd| fd as c_int)
     }
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
