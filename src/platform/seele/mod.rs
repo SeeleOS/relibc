@@ -23,15 +23,15 @@ use crate::{
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize},
+        sys_mman::{
+            MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
+            PROT_NONE, PROT_READ, PROT_WRITE,
+        },
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
-        sys_mman::{
-            MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE,
-            PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE,
-        },
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET, getpid},
@@ -63,7 +63,7 @@ const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
 const CLONE_SIGHAND: usize = 0x0800;
 const CLONE_THREAD: usize = 0x00010000;
-const PRINT_STUB_MESSAGE: bool = false;
+const PRINT_STUB_MESSAGE: bool = true;
 static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
 
 #[repr(C)]
