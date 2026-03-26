@@ -35,7 +35,7 @@ use crate::{
         sys_time::timezone,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::itimerspec,
-        unistd::{SEEK_CUR, SEEK_SET, getpid},
+        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpid},
     },
     ld_so::tcb::OsSpecific,
     out::Out,
@@ -239,8 +239,25 @@ impl Sys {
 impl Pal for Sys {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        let _ = (path, mode);
-        Sys::stub("ACCESS").map(|_| ())
+        let supported_mode_bits = R_OK | W_OK | X_OK;
+        if (mode & !supported_mode_bits) != F_OK {
+            return Err(Errno(EINVAL));
+        }
+        if mode != F_OK {
+            return Err(Errno(ENOSYS));
+        }
+
+        let mut stat = stat::default();
+        let from_current_dir = !path.to_bytes().starts_with(b"/");
+
+        e_raw(process_result(file_info(
+            from_current_dir,
+            false,
+            path.as_ptr(),
+            &mut stat as *mut stat as *mut u8,
+            0,
+        )))
+        .map(|_| ())
     }
 
     #[cfg(target_arch = "aarch64")]
