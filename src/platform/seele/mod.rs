@@ -1,5 +1,6 @@
 use alloc::{slice, str};
 use seele_sys::{
+    permission::Permissions,
     syscalls::{
         self, allocate_mem, execve,
         filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
@@ -65,6 +66,22 @@ const CLONE_SIGHAND: usize = 0x0800;
 const CLONE_THREAD: usize = 0x00010000;
 const PRINT_STUB_MESSAGE: bool = true;
 static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
+
+fn prot_to_permissions(prot: c_int) -> Permissions {
+    let mut permissions = Permissions::empty();
+
+    if (prot & PROT_READ) != 0 {
+        permissions |= Permissions::READABLE;
+    }
+    if (prot & PROT_WRITE) != 0 {
+        permissions |= Permissions::WRITABLE;
+    }
+    if (prot & PROT_EXEC) != 0 {
+        permissions |= Permissions::EXECUTABLE;
+    }
+
+    permissions
+}
 
 #[repr(C)]
 #[derive(Default)]
@@ -662,20 +679,17 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
 
-        if (prot & PROT_EXEC) != 0 {
-            return Err(Errno(ENOSYS));
-        }
-
-        // The kernel AllocateMem path currently only provides fresh readable/writable
-        // anonymous pages. Accept only requests that can be represented that way.
-        let supported_prot = PROT_NONE | PROT_READ | PROT_WRITE;
+        // The kernel AllocateMem path currently only provides fresh anonymous pages.
+        // Translate the mmap protection bits into Seele page permissions.
+        let supported_prot = PROT_NONE | PROT_READ | PROT_WRITE | PROT_EXEC;
         if (prot & supported_prot) != prot {
             return Err(Errno(ENOSYS));
         }
 
         let _is_stack = (flags & MAP_STACK) != 0;
+        let permissions = prot_to_permissions(prot);
 
-        match allocate_mem(len as u64, flags as u64) {
+        match allocate_mem(len as u64, flags as u64, permissions) {
             Ok(addr) => Ok(addr as *mut c_void),
             Err(_) => Err(Errno(EIO)),
         }
