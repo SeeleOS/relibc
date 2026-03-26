@@ -199,9 +199,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
 
     let at_entry = at_entry.expect_notls("`AT_ENTRY` must be present");
-    let at_base = at_base.unwrap_or_default();
-
-    let self_base = if at_base != 0 {
+    let self_base = if let Some(at_base) = at_base {
         at_base
     } else {
         let ph = phdrs
