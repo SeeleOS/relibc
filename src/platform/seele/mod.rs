@@ -3,7 +3,9 @@ use seele_sys::{
     permission::Permissions,
     syscalls::{
         self, allocate_mem, execve,
-        filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
+        filesystem::{
+            change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
+        },
         futex, get_process_id, get_process_parent_id, get_thread_id,
         object::{
             Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
@@ -687,10 +689,6 @@ impl Pal for Sys {
             return Err(Errno(ENOSYS));
         }
 
-        if fildes != -1 || off != 0 {
-            return Err(Errno(ENOSYS));
-        }
-
         let unsupported_prot = prot & !(PROT_NONE | PROT_READ | PROT_WRITE | PROT_EXEC);
         if unsupported_prot != 0 {
             return Err(Errno(EINVAL));
@@ -705,6 +703,23 @@ impl Pal for Sys {
 
         let _is_stack = (flags & MAP_STACK) != 0;
         let permissions = prot_to_permissions(prot);
+
+        if (flags & MAP_ANON) == 0 {
+            if fildes < 0 || off < 0 {
+                return Err(Errno(EINVAL));
+            }
+            if (off as usize) % 4096 != 0 {
+                return Err(Errno(EINVAL));
+            }
+
+            return e_raw(process_result(map_file(
+                fildes as u64,
+                len as u64,
+                off as u64,
+                permissions,
+            )))
+            .map(|r| r as *mut c_void);
+        }
 
         match allocate_mem(len as u64, flags as u64, permissions) {
             Ok(addr) => Ok(addr as *mut c_void),
