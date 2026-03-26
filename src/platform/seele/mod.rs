@@ -10,7 +10,7 @@ use seele_sys::{
             configurate_object, control_object, get_terminal_info, read_object, remove_object,
             set_terminal_info, write_object,
         },
-        wait_for_process_exit,
+        update_mem_perms, wait_for_process_exit,
     },
     utils::process_result,
 };
@@ -707,8 +707,12 @@ impl Pal for Sys {
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<()> {
-        let _ = (addr, len, prot);
-        Sys::stub("MPROTECT").map(|_| ())
+        e_raw(process_result(update_mem_perms(
+            addr as u64,
+            len as u64,
+            prot_to_permissions(prot),
+        )))
+        .map(|_| ())
     }
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
