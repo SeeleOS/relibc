@@ -5,7 +5,7 @@ use seele_sys::{
 };
 
 use crate::{
-    header::{netdb::protoent, signal::sigval},
+    header::{errno::EINVAL, netdb::protoent, signal::sigval},
     platform::{Pal, sys::e_raw},
 };
 use core::mem;
@@ -62,7 +62,11 @@ impl PalSignal for Sys {
     }
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()> {
-        e_raw(process_result(send_signal(pid as u64, Signal::from(sig)))).map(|_| ())
+        e_raw(process_result(send_signal(
+            pid as u64,
+            Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?,
+        )))
+        .map(|_| ())
     }
 
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
@@ -105,7 +109,7 @@ impl PalSignal for Sys {
             return Err(Errno(22));
         }
 
-        let signal = Signal::from(sig);
+        let signal = Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?;
         let new_action = act.map(SignalAction::from);
         let mut old_action = oact.as_ref().map(|_| SignalAction::default());
 
