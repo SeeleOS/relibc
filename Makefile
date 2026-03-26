@@ -20,11 +20,19 @@ export CFLAGS=-I$(TARGET_HEADERS)
 PROFILE?=release
 
 ifeq ($(TARGET),x86_64-seele)
+LD_SO_SCRIPT_TARGET:=x86_64-unknown-redox
+else
+LD_SO_SCRIPT_TARGET:=$(TARGET)
+endif
+
+ifeq ($(TARGET),x86_64-seele)
 LIBS=\
 	$(BUILD)/$(PROFILE)/libc.a \
+	$(BUILD)/$(PROFILE)/libc.so \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
 	$(BUILD)/$(PROFILE)/crtn.o \
+	$(BUILD)/$(PROFILE)/ld_so \
 	$(BUILD)/$(PROFILE)/libm.a \
 	$(BUILD)/$(PROFILE)/librt.a \
 	$(BUILD)/$(PROFILE)/libpthread.a
@@ -95,9 +103,14 @@ install-libs: headers libs
 ifneq ($(filter %-seele,$(TARGET)),)
 	sudo mkdir -pv "$(DESTDIR)/system_lib"
 	sudo cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/system_lib"
+	sudo cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/system_lib"
+	sudo ln -vnfs libc.so "$(DESTDIR)/system_lib/libc.so.6"
 	sudo cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/system_lib"
+	sudo ln -vnfs crt0.o "$(DESTDIR)/system_lib/crt1.o"
 	sudo cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/system_lib"
 	sudo cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/system_lib"
+	sudo mkdir -pv "$(DESTDIR)/$(dir $(LD_SO_PATH))"
+	sudo cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
 	sudo cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/system_lib/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	sudo $(AR) -rcs "$(DESTDIR)/system_lib/libdl.a"
@@ -169,12 +182,12 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 
 $(BUILD)/$(PROFILE)/ld_so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.o $(BUILD)/$(PROFILE)/libc.a $(BUILD)/$(PROFILE)/crtn.o
 	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
-	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
+	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(LD_SO_SCRIPT_TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
 
 ifeq ($(TARGET),x86_64-seele)
 # For Seele we still want the usual libm/librt/libpthread names so that
 # the Rust toolchain can satisfy -lm/-lrt/-lpthread when linking userspace
-# binaries. We only build static variants here.
+# binaries while libc/ld.so are built as shared objects.
 $(BUILD)/$(PROFILE)/libm.a: $(BUILD)/openlibm/libopenlibm.a
 	cp $< $@
 
