@@ -899,6 +899,8 @@ impl Linker {
             if let Some(ld_path) = self.config.library_path.as_ref() {
                 search_paths.extend(ld_path.split(PATH_SEP));
             }
+            #[cfg(target_os = "seele")]
+            search_paths.push("misc/libs/system_lib");
             search_paths.push("/lib");
             for part in search_paths.iter() {
                 full_path = format!("{}/{}", part, name);
