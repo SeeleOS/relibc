@@ -588,7 +588,7 @@ impl Pal for Sys {
 
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
         unsafe {
-            (*tp.as_mut_ptr()).tv_sec = get_time()? as i64;
+            (*tp.as_mut_ptr()).tv_sec = e_raw(process_result(get_time()))? as i64;
         }
 
         Ok(())
