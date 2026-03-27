@@ -677,10 +677,6 @@ impl Pal for Sys {
             return Err(Errno(ENOSYS));
         }
 
-        if (flags & MAP_ANON) == 0 {
-            return Err(Errno(ENOSYS));
-        }
-
         if (flags & (MAP_FIXED | MAP_FIXED_NOREPLACE)) != 0 {
             return Err(Errno(ENOSYS));
         }
