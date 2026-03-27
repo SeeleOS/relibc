@@ -2,7 +2,7 @@ use alloc::{slice, str};
 use seele_sys::{
     permission::Permissions,
     syscalls::{
-        self, allocate_mem, execve,
+        self, allocate_mem, deallocate_mem, execve,
         filesystem::{
             change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
         },
@@ -758,8 +758,7 @@ impl Pal for Sys {
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()> {
-        let _ = (addr, len);
-        Sys::stub("MUNMAP").map(|_| ())
+        e_raw(process_result(deallocate_mem(addr as u64, len as u64))).map(|_| ())
     }
 
     unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
