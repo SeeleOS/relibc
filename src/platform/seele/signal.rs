@@ -42,7 +42,7 @@ impl From<&SignalAction> for sigaction {
             sa_handler,
             sa_flags: 0,
             sa_restorer: None,
-            sa_mask: action.ignored_signals.bits(),
+            sa_mask: action.sig_handler_ignored_sigs.bits(),
         }
     }
 }
@@ -57,7 +57,7 @@ impl From<&sigaction> for SignalAction {
 
         Self {
             handling_type,
-            ignored_signals: Signals::from_bits_retain(action.sa_mask),
+            sig_handler_ignored_sigs: Signals::from_bits_retain(action.sa_mask),
         }
     }
 }
@@ -156,8 +156,12 @@ impl PalSignal for Sys {
         };
 
         let mut signals = signals.ok_or(Errno(EINVAL))?;
-        signals.remove(Signals::from(Signal::try_from(SIGKILL as u64).map_err(|_| Errno(EINVAL))?));
-        signals.remove(Signals::from(Signal::try_from(SIGSTOP as u64).map_err(|_| Errno(EINVAL))?));
+        signals.remove(Signals::from(
+            Signal::try_from(SIGKILL as u64).map_err(|_| Errno(EINVAL))?,
+        ));
+        signals.remove(Signals::from(
+            Signal::try_from(SIGSTOP as u64).map_err(|_| Errno(EINVAL))?,
+        ));
 
         let old_signals = &mut Signals::default() as *mut Signals;
 
