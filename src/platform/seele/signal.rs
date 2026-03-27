@@ -1,11 +1,18 @@
 use seele_sys::{
+    errors::SyscallError,
     signal::{Signal, SignalAction, SignalHandlingType, Signals},
-    syscalls::signal::{register_signal_action, send_signal},
+    syscalls::signal::{
+        block_signals, register_signal_action, send_signal, set_blocked_signals, unblock_signals,
+    },
     utils::process_result,
 };
 
 use crate::{
-    header::{errno::EINVAL, netdb::protoent, signal::sigval},
+    header::{
+        errno::EINVAL,
+        netdb::protoent,
+        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, sigval},
+    },
     platform::{Pal, sys::e_raw},
 };
 use core::mem;
@@ -142,8 +149,31 @@ impl PalSignal for Sys {
     }
 
     fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<()> {
-        let _sigsetsize = mem::size_of::<sigset_t>();
-        Sys::sigprocmask_stub(how, set, oset)
+        let signals = if let Some(set) = set {
+            Signals::from_bits(*set)
+        } else {
+            Signals::from_bits(0)
+        };
+
+        let signals = signals.ok_or(Errno(EINVAL))?;
+
+        let old_signals = &mut Signals::default() as *mut Signals;
+
+        let result = e_raw(process_result(match how {
+            SIG_BLOCK => block_signals((signals), old_signals),
+            SIG_UNBLOCK => unblock_signals((signals), old_signals),
+            SIG_SETMASK => set_blocked_signals(signals, old_signals),
+            _ => Err(SyscallError::InvalidArguments),
+        }))
+        .map(|_| ());
+
+        if let Some(oset) = oset {
+            unsafe {
+                *oset = (*old_signals).bits();
+            }
+        }
+
+        result
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
