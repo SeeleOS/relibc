@@ -11,7 +11,7 @@ use crate::{
     header::{
         errno::EINVAL,
         netdb::protoent,
-        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, sigval},
+        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGKILL, SIGSTOP, sigval},
     },
     platform::{Pal, sys::e_raw},
 };
@@ -155,7 +155,9 @@ impl PalSignal for Sys {
             Signals::from_bits(0)
         };
 
-        let signals = signals.ok_or(Errno(EINVAL))?;
+        let mut signals = signals.ok_or(Errno(EINVAL))?;
+        signals.remove(Signals::from(Signal::try_from(SIGKILL as u64).map_err(|_| Errno(EINVAL))?));
+        signals.remove(Signals::from(Signal::try_from(SIGSTOP as u64).map_err(|_| Errno(EINVAL))?));
 
         let old_signals = &mut Signals::default() as *mut Signals;
 
