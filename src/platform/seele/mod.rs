@@ -17,6 +17,7 @@ use seele_sys::{
     },
     utils::process_result,
 };
+use spin::Mutex;
 
 use super::{Pal, types::*};
 use crate::{
@@ -969,8 +970,12 @@ impl Pal for Sys {
     }
 
     fn umask(mask: mode_t) -> mode_t {
-        let _ = mask;
-        Sys::stub("UMASK").unwrap_or(0) as mode_t
+        static UMASK: Mutex<mode_t> = Mutex::new(0o022);
+
+        let mut umask_locked = UMASK.lock();
+        let old = *umask_locked;
+        *umask_locked = mask & 0o777;
+        old
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<()> {
