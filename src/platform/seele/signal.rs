@@ -1,9 +1,12 @@
 use seele_sys::{
     errors::SyscallError,
     signal::{SigHandlerFn2, Signal, SignalAction, SignalHandlingType, Signals},
-    syscalls::signal::{
-        block_signals, register_signal_action, send_signal, set_blocked_signals,
-        sig_handler_return, unblock_signals,
+    syscalls::{
+        get_process_id,
+        signal::{
+            block_signals, register_signal_action, send_signal, set_blocked_signals,
+            sig_handler_return, unblock_signals,
+        },
     },
     utils::process_result,
 };
@@ -12,7 +15,11 @@ use crate::{
     header::{
         errno::EINVAL,
         netdb::protoent,
-        signal::{SA_RESTORER, SA_SIGINFO, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGKILL, SIGSTOP, sigval},
+        signal::{
+            SA_RESTORER, SA_SIGINFO, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGKILL, SIGSTOP, kill,
+            sigval,
+        },
+        unistd::getpid,
     },
     platform::{Pal, sys::e_raw},
 };
@@ -43,9 +50,9 @@ impl From<&SignalAction> for sigaction {
             SignalHandlingType::Ignore => unsafe { core::mem::transmute(SIG_IGN) },
             SignalHandlingType::Function1(function) => Some(function),
             SignalHandlingType::Function2(function) => unsafe {
-                core::mem::transmute::<Option<SigHandlerFn2>, Option<extern "C" fn(c_int)>>(
-                    Some(function),
-                )
+                core::mem::transmute::<Option<SigHandlerFn2>, Option<extern "C" fn(c_int)>>(Some(
+                    function,
+                ))
             },
         };
 
@@ -73,9 +80,7 @@ impl From<&sigaction> for SignalAction {
             Some(SIG_IGN) => SignalHandlingType::Ignore,
             Some(_) if (action.sa_flags as usize & SA_SIGINFO) != 0 => {
                 SignalHandlingType::Function2(unsafe {
-                    core::mem::transmute::<usize, SigHandlerFn2>(
-                        action.sa_handler.unwrap() as usize,
-                    )
+                    core::mem::transmute::<usize, SigHandlerFn2>(action.sa_handler.unwrap() as usize)
                 })
             }
             Some(_) => SignalHandlingType::Function1(action.sa_handler.unwrap()),
@@ -87,7 +92,8 @@ impl From<&sigaction> for SignalAction {
             flags: action.sa_flags as u64,
             restorer: action
                 .sa_restorer
-                .unwrap_or(__seele_restore_rt as unsafe extern "C" fn()) as usize,
+                .unwrap_or(__seele_restore_rt as unsafe extern "C" fn())
+                as usize,
         }
     }
 }
