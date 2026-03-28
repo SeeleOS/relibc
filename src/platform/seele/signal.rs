@@ -127,9 +127,8 @@ impl PalSignal for Sys {
     }
 
     fn raise(sig: c_int) -> Result<()> {
-        let _ = sig;
-        let _tid = Sys::gettid() as pid_t;
-        Sys::stub("TKILL").map(|_| ())
+        kill(getpid(), sig);
+        Ok(())
     }
 
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
