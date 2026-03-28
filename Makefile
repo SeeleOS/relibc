@@ -142,6 +142,7 @@ install-tests: tests
 	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
 
 install: mount install-headers install-libs
+	sync
 
 submodules:
 	git submodule sync
