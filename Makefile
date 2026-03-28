@@ -77,7 +77,9 @@ headers: $(HEADERS_DEPS)
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
-	done; echo -e "\033[0;36;49mAll headers written\033[0m";
+	done; \
+	printf "\n/\* Added manually: implemented in src/c/wchar.c \*/\nfloat wcstof(const wchar_t *ptr, wchar_t **end);\nlong double wcstold(const wchar_t *ptr, wchar_t **end);\n" >> "$(TARGET_HEADERS)/wchar.h"; \
+	echo -e "\033[0;36;49mAll headers written\033[0m";
 
 clean:
 	$(CARGO) clean
