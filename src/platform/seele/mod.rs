@@ -295,13 +295,19 @@ impl Pal for Sys {
     }
 
     fn clock_gettime(clk_id: clockid_t, mut tp: Out<timespec>) -> Result<()> {
-        let _ = (clk_id, tp.as_mut_ptr());
-        Sys::stub("CLOCK_GETTIME").map(|_| ())
+        let sec = e_raw(process_result(get_time()))? as i64;
+
+        unsafe {
+            let ts = tp.as_mut_ptr();
+            (*ts).tv_sec = sec;
+            (*ts).tv_nsec = 0;
+        }
+
+        Ok(())
     }
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()> {
-        let _ = (clk_id, tp);
-        Sys::stub("CLOCK_SETTIME").map(|_| ())
+        Err(Errno(ENOSYS))
     }
 
     fn close(fildes: c_int) -> Result<()> {
