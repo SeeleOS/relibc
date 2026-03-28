@@ -513,8 +513,7 @@ impl Pal for Sys {
     }
 
     fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
-        let _ = list.as_mut_ptr();
-        Ok(Sys::stub("GETGROUPS")? as c_int)
+        Ok(0)
     }
 
     fn getpagesize() -> usize {
@@ -896,8 +895,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()> {
-        let _ = (size, list);
-        Sys::stub("SETGROUPS").map(|_| ())
+        Ok(())
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
