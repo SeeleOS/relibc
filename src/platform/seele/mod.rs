@@ -972,7 +972,7 @@ impl Pal for Sys {
 
         get_system_info(system_info as *mut SystemInfo);
 
-        utsname.write(system_info.into());
+        utsname.write(utsname::from(system_info));
 
         Ok(())
     }
