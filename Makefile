@@ -1,5 +1,7 @@
 include config.mk
 
+.DEFAULT_GOAL := all
+
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
 CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
