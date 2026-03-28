@@ -968,9 +968,9 @@ impl Pal for Sys {
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<()> {
-        let system_info = &mut SystemInfo::new("", "");
+        let mut system_info = SystemInfo::new("", "");
 
-        get_system_info(system_info as *mut SystemInfo);
+        get_system_info(&mut system_info as *mut SystemInfo);
 
         utsname.write(utsname::from(system_info));
 
