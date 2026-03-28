@@ -1,12 +1,13 @@
 use alloc::{slice, str};
 use seele_sys::{
+    misc::SystemInfo,
     permission::Permissions,
     syscalls::{
         self, allocate_mem, deallocate_mem, execve,
         filesystem::{
             change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
         },
-        futex, get_process_id, get_process_parent_id, get_thread_id, get_time,
+        futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id, get_time,
         object::{
             Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
             configurate_object, control_object, get_terminal_info, read_object, remove_object,
@@ -23,7 +24,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EAGAIN, EINVAL, EIO, ENOSYS},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize},
         sys_mman::{
@@ -967,8 +968,13 @@ impl Pal for Sys {
     }
 
     fn uname(mut utsname: Out<utsname>) -> Result<()> {
-        let _ = utsname.as_mut_ptr();
-        Sys::stub("UNAME").map(|_| ())
+        let system_info = &mut SystemInfo::new("", "");
+
+        get_system_info(system_info as *mut SystemInfo);
+
+        utsname.write(system_info.into());
+
+        Ok(())
     }
 
     fn unlink(path: CStr) -> Result<()> {
