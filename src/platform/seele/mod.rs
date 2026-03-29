@@ -7,7 +7,7 @@ use seele_sys::{
         filesystem::{
             change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
         },
-        futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id, get_time,
+        futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
         misc::{get_current_time, time_since_boot},
         object::{
             Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
@@ -599,8 +599,19 @@ impl Pal for Sys {
     }
 
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
+        let nanoseconds = e_raw(process_result(get_current_time()))? as u64;
+
         unsafe {
-            (*tp.as_mut_ptr()).tv_sec = e_raw(process_result(get_time()))? as i64;
+            let tv = tp.as_mut_ptr();
+            (*tv).tv_sec = (nanoseconds / 1_000_000_000) as time_t;
+            (*tv).tv_usec = ((nanoseconds % 1_000_000_000) / 1_000) as suseconds_t;
+        }
+
+        if let Some(mut tzp) = tzp {
+            tzp.write(timezone {
+                tz_minuteswest: 0,
+                tz_dsttime: 0,
+            });
         }
 
         Ok(())
