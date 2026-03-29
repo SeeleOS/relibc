@@ -8,6 +8,7 @@ use seele_sys::{
             change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
         },
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id, get_time,
+        misc::{get_current_time, time_since_boot},
         object::{
             Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
             configurate_object, control_object, get_terminal_info, read_object, remove_object,
@@ -38,7 +39,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
-        time::itimerspec,
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpid},
     },
     ld_so::tcb::OsSpecific,
@@ -296,12 +297,16 @@ impl Pal for Sys {
     }
 
     fn clock_gettime(clk_id: clockid_t, mut tp: Out<timespec>) -> Result<()> {
-        let sec = e_raw(process_result(get_time()))? as i64;
+        let nanoseconds = match clk_id {
+            CLOCK_REALTIME => e_raw(process_result(get_current_time()))?,
+            CLOCK_MONOTONIC => e_raw(process_result(time_since_boot()))?,
+            _ => return Err(Errno(EINVAL)),
+        } as i64;
 
         unsafe {
             let ts = tp.as_mut_ptr();
-            (*ts).tv_sec = sec;
-            (*ts).tv_nsec = 0;
+            (*ts).tv_sec = nanoseconds / 1_000_000_000;
+            (*ts).tv_nsec = nanoseconds % 1_000_000_000;
         }
 
         Ok(())
