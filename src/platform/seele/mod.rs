@@ -1,5 +1,6 @@
 use alloc::{slice, str};
 use seele_sys::{
+    abi::object::{ControlCommand, TerminalInfo as SeeleTerminalInfo},
     misc::SystemInfo,
     permission::Permissions,
     syscalls::{
@@ -10,9 +11,8 @@ use seele_sys::{
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
         misc::{get_current_time, time_since_boot},
         object::{
-            Command, TerminalInfo as SeeleTerminalInfo, clone_object, clone_object_to,
-            configurate_object, control_object, get_terminal_info, read_object, remove_object,
-            set_terminal_info, write_object,
+            clone_object, clone_object_to, configurate_object, control_object, get_terminal_info,
+            read_object, remove_object, set_terminal_info, write_object,
         },
         update_mem_perms, wait_for_process_exit,
     },
@@ -445,7 +445,7 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
-        let command = Command::from_linux(cmd).ok_or(Errno(EINVAL))?;
+        let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
         e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
     }
 
