@@ -792,11 +792,6 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
 
-        let map_type = flags & MAP_TYPE;
-        if map_type != MAP_PRIVATE {
-            return Err(Errno(ENOSYS));
-        }
-
         if (flags & (MAP_FIXED | MAP_FIXED_NOREPLACE)) != 0 {
             return Err(Errno(ENOSYS));
         }
