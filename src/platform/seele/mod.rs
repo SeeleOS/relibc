@@ -1,6 +1,9 @@
 use alloc::{slice, str};
 use seele_sys::{
-    abi::object::{ControlCommand, TerminalInfo as SeeleTerminalInfo, device_from_path},
+    abi::{
+        framebuffer::{FramebufferInfo as SeeleFramebufferInfo, FramebufferPixelFormat},
+        object::{ControlCommand, TerminalInfo as SeeleTerminalInfo, device_from_path},
+    },
     misc::SystemInfo,
     permission::Permissions,
     syscalls::{
@@ -11,8 +14,9 @@ use seele_sys::{
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
         misc::{get_current_time, time_since_boot},
         object::{
-            clone_object, clone_object_to, configurate_object, control_object, get_terminal_info,
-            open_device, read_object, remove_object, set_terminal_info, write_object,
+            clone_object, clone_object_to, configurate_object, control_object,
+            get_framebuffer_info, get_terminal_info, open_device, read_object, remove_object,
+            set_terminal_info, write_object,
         },
         update_mem_perms, wait_for_process_exit,
     },
@@ -28,7 +32,11 @@ use crate::{
         errno::{EAGAIN, EINVAL, EIO, ENOSYS},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
-        sys_ioctl::{TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize},
+        sys_ioctl::{
+            FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOGET_FSCREENINFO,
+            FBIOGET_VSCREENINFO, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize,
+            fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo,
+        },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
             PROT_NONE, PROT_READ, PROT_WRITE,
@@ -120,6 +128,76 @@ pub fn e_raw(sys: usize) -> Result<usize> {
 pub struct Sys;
 
 impl Sys {
+    fn framebuffer_bitfields(
+        pixel_format: FramebufferPixelFormat,
+    ) -> (fb_bitfield, fb_bitfield, fb_bitfield) {
+        match pixel_format {
+            // Seele stores pixels in memory as RGB or BGR byte order.
+            FramebufferPixelFormat::Rgb => (
+                fb_bitfield {
+                    offset: 0,
+                    length: 8,
+                    msb_right: 0,
+                },
+                fb_bitfield {
+                    offset: 8,
+                    length: 8,
+                    msb_right: 0,
+                },
+                fb_bitfield {
+                    offset: 16,
+                    length: 8,
+                    msb_right: 0,
+                },
+            ),
+            FramebufferPixelFormat::Bgr => (
+                fb_bitfield {
+                    offset: 16,
+                    length: 8,
+                    msb_right: 0,
+                },
+                fb_bitfield {
+                    offset: 8,
+                    length: 8,
+                    msb_right: 0,
+                },
+                fb_bitfield {
+                    offset: 0,
+                    length: 8,
+                    msb_right: 0,
+                },
+            ),
+        }
+    }
+
+    fn fill_linux_fb_fix(info: SeeleFramebufferInfo, out: &mut fb_fix_screeninfo) {
+        *out = fb_fix_screeninfo::default();
+        let id = b"seelefb\0";
+        for (dst, src) in out.id.iter_mut().zip(id.iter().copied()) {
+            *dst = src as c_char;
+        }
+        out.smem_len = info.byte_len as c_uint;
+        out.type_ = FB_TYPE_PACKED_PIXELS as c_uint;
+        out.visual = FB_VISUAL_TRUECOLOR as c_uint;
+        out.line_length = (info.stride * info.bytes_per_pixel) as c_uint;
+    }
+
+    fn fill_linux_fb_var(info: SeeleFramebufferInfo, out: &mut fb_var_screeninfo) {
+        *out = fb_var_screeninfo::default();
+        out.xres = info.width as c_uint;
+        out.yres = info.height as c_uint;
+        out.xres_virtual = info.stride as c_uint;
+        out.yres_virtual = info.height as c_uint;
+        out.bits_per_pixel = (info.bytes_per_pixel * 8) as c_uint;
+        let (red, green, blue) = Self::framebuffer_bitfields(info.pixel_format);
+        out.red = red;
+        out.green = green;
+        out.blue = blue;
+        out.transp = fb_bitfield::default();
+        out.height = info.height as c_uint;
+        out.width = info.width as c_uint;
+    }
+
     fn print_stub_message(args: core::fmt::Arguments<'_>) {
         use core::fmt::Write;
 
@@ -140,6 +218,24 @@ impl Sys {
 
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
         match request {
+            FBIOGET_FSCREENINFO => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+                let mut info = SeeleFramebufferInfo::default();
+                e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)))?;
+                Self::fill_linux_fb_fix(info, unsafe { &mut *out.cast::<fb_fix_screeninfo>() });
+                Ok(0)
+            }
+            FBIOGET_VSCREENINFO => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+                let mut info = SeeleFramebufferInfo::default();
+                e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)))?;
+                Self::fill_linux_fb_var(info, unsafe { &mut *out.cast::<fb_var_screeninfo>() });
+                Ok(0)
+            }
             TCGETS => {
                 // Makes a new blank Seele terminal info
                 let mut info = SeeleTerminalInfo::default();
