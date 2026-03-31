@@ -815,6 +815,9 @@ impl Pal for Sys {
         let _is_stack = (flags & MAP_STACK) != 0;
         let permissions = prot_to_permissions(prot);
 
+        // Maps the object if its not a anonymous map.
+        // an anonymous map basically means you just want
+        // a chunk of memory, and you dont want to map a object
         if (flags & MAP_ANON) == 0 {
             if fildes < 0 || off < 0 {
                 return Err(Errno(EINVAL));
@@ -832,6 +835,7 @@ impl Pal for Sys {
             .map(|r| r as *mut c_void);
         }
 
+        // Just allocates memory if its a anonymous map
         match allocate_mem(len as u64, flags as u64, permissions) {
             Ok(addr) => Ok(addr as *mut c_void),
             Err(_) => Err(Errno(EIO)),
