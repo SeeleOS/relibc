@@ -40,6 +40,7 @@ pub mod langinfo;
 // TODO: libintl.h
 pub mod libgen;
 pub mod limits;
+pub mod linux_fb;
 pub mod locale;
 pub mod malloc;
 // math.h implemented in C

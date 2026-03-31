@@ -1,0 +1,12 @@
+sys_includes = ["stdint.h"]
+include_guard = "_LINUX_FB_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
+
+[export]
+include = ["fb_bitfield", "fb_fix_screeninfo", "fb_var_screeninfo"]
