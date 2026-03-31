@@ -1,6 +1,6 @@
 use alloc::{slice, str};
 use seele_sys::{
-    abi::object::{ControlCommand, TerminalInfo as SeeleTerminalInfo},
+    abi::object::{ControlCommand, TerminalInfo as SeeleTerminalInfo, device_from_path},
     misc::SystemInfo,
     permission::Permissions,
     syscalls::{
@@ -12,7 +12,7 @@ use seele_sys::{
         misc::{get_current_time, time_since_boot},
         object::{
             clone_object, clone_object_to, configurate_object, control_object, get_terminal_info,
-            read_object, remove_object, set_terminal_info, write_object,
+            open_device, read_object, remove_object, set_terminal_info, write_object,
         },
         update_mem_perms, wait_for_process_exit,
     },
@@ -798,6 +798,10 @@ impl Pal for Sys {
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        if let Some(device) = device_from_path(path.to_str().map_err(|_| Errno(EINVAL))?) {
+            return e_raw(process_result(open_device(device))).map(|fd| fd as c_int);
+        }
+
         e_raw(process_result(open_file(
             path.as_ptr(),
             (oflag & O_CREAT) != 0,
