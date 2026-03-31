@@ -8,15 +8,13 @@ use seele_sys::{
     permission::Permissions,
     syscalls::{
         self, allocate_mem, deallocate_mem, execve,
-        filesystem::{
-            change_dir, directory_contents, file_info, get_current_directory, map_file, open_file,
-        },
+        filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
         misc::{get_current_time, time_since_boot},
         object::{
             clone_object, clone_object_to, configurate_object, control_object,
-            get_framebuffer_info, get_terminal_info, open_device, read_object, remove_object,
-            set_terminal_info, write_object,
+            get_framebuffer_info, get_terminal_info, mmap_object, open_device, read_object,
+            remove_object, set_terminal_info, write_object,
         },
         update_mem_perms, wait_for_process_exit,
     },
@@ -33,9 +31,9 @@ use crate::{
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{
-            FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOGET_FSCREENINFO,
-            FBIOGET_VSCREENINFO, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, winsize,
-            fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo,
+            FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_fix_screeninfo,
+            fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
@@ -830,7 +828,7 @@ impl Pal for Sys {
                 return Err(Errno(EINVAL));
             }
 
-            return e_raw(process_result(map_file(
+            return e_raw(process_result(mmap_object(
                 fildes as u64,
                 len as u64,
                 off as u64,
