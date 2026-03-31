@@ -828,7 +828,7 @@ impl Pal for Sys {
 
             return e_raw(process_result(mmap_object(
                 fildes as u64,
-                len as u64,
+                len.div_ceil(4096) as u64,
                 off as u64,
                 permissions,
             )))
