@@ -8,9 +8,12 @@ use seele_sys::{
     permission::Permissions,
     syscalls::{
         self, allocate_mem, deallocate_mem, execve,
-        filesystem::{change_dir, directory_contents, file_info, get_current_directory, open_file},
+        filesystem::{
+            change_dir, create_directory, delete_file, directory_contents, file_info,
+            get_current_directory, link_file, open_file,
+        },
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
-        misc::{get_current_time, time_since_boot},
+        misc::{get_current_time, sleep, time_since_boot},
         object::{
             clone_object, clone_object_to, configurate_object, control_object,
             get_framebuffer_info, get_terminal_info, mmap_object, open_device, read_object,
@@ -728,8 +731,7 @@ impl Pal for Sys {
     }
 
     fn link(path1: CStr, path2: CStr) -> Result<()> {
-        let _ = (path1, path2);
-        Sys::stub("LINKAT").map(|_| ())
+        e_raw(process_result(link_file(path1.as_ptr(), path2.as_ptr()))).map(|_| ())
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
@@ -738,8 +740,12 @@ impl Pal for Sys {
     }
 
     fn mkdirat(dir_fildes: c_int, path: CStr, mode: mode_t) -> Result<()> {
-        let _ = (dir_fildes, path, mode);
-        Sys::stub("MKDIRAT").map(|_| ())
+        let _ = mode;
+        if dir_fildes != AT_FDCWD {
+            return Err(Errno(ENOSYS));
+        }
+
+        e_raw(process_result(create_directory(path.as_ptr(), false))).map(|_| ())
     }
 
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
@@ -886,8 +892,32 @@ impl Pal for Sys {
     }
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
-        let _ = (rqtp, rmtp);
-        Sys::stub("NANOSLEEP").map(|_| ())
+        if rqtp.is_null() {
+            return Err(Errno(EINVAL));
+        }
+
+        let requested = unsafe { &*rqtp };
+        if requested.tv_sec < 0 || requested.tv_nsec < 0 || requested.tv_nsec >= 1_000_000_000 {
+            return Err(Errno(EINVAL));
+        }
+
+        let seconds = u64::try_from(requested.tv_sec).map_err(|_| Errno(EINVAL))?;
+        let nanoseconds = u64::try_from(requested.tv_nsec).map_err(|_| Errno(EINVAL))?;
+        let total = seconds
+            .checked_mul(1_000_000_000)
+            .and_then(|value| value.checked_add(nanoseconds))
+            .ok_or(Errno(EINVAL))?;
+
+        e_raw(process_result(sleep(total)))?;
+
+        if !rmtp.is_null() {
+            unsafe {
+                (*rmtp).tv_sec = 0;
+                (*rmtp).tv_nsec = 0;
+            }
+        }
+
+        Ok(())
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
@@ -1102,8 +1132,7 @@ impl Pal for Sys {
     }
 
     fn unlink(path: CStr) -> Result<()> {
-        let _ = path;
-        Sys::stub("UNLINKAT").map(|_| ())
+        e_raw(process_result(delete_file(path.as_ptr()))).map(|_| ())
     }
 
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
