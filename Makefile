@@ -94,8 +94,8 @@ fmt:
 
 install-headers: headers libs
 ifneq ($(filter %-seele,$(TARGET)),)
-	sudo mkdir -pv "$(DESTDIR)/include"
-	sudo cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
+	sudo mkdir -pv "$(DESTDIR)/include/c"
+	sudo cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include/c"
 else
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
