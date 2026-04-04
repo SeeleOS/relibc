@@ -71,6 +71,9 @@ mod epoll;
 mod ptrace;
 mod signal;
 mod socket;
+mod unwind_stub;
+
+pub use unwind_stub::*;
 
 const SYS_CLONE: usize = 56;
 const CLONE_VM: usize = 0x0100;

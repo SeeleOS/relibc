@@ -116,39 +116,3 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 
     core::intrinsics::abort();
 }
-
-// Minimal stubs for libunwind-style APIs used by Rust's backtrace support.
-// Seele currently runs with `panic = abort` and does not support full stack
-// unwinding, so these implementations simply disable backtraces while
-// satisfying the linker.
-
-use core::ffi::c_void;
-
-#[cfg(not(test))]
-#[allow(non_snake_case)]
-#[linkage = "weak"]
-#[unsafe(no_mangle)]
-pub extern "C" fn _Unwind_GetIP(_ctx: *mut c_void) -> usize {
-    use core::fmt::Write;
-
-    let mut w = platform::FileWriter::new(2);
-    let _ = w.write_str("_Unwind_GetIP stub called\n");
-
-    0
-}
-
-#[cfg(not(test))]
-#[allow(non_snake_case)]
-#[linkage = "weak"]
-#[unsafe(no_mangle)]
-pub extern "C" fn _Unwind_Backtrace(
-    _cb: extern "C" fn(*mut c_void, *mut c_void) -> i32,
-    _data: *mut c_void,
-) -> i32 {
-    use core::fmt::Write;
-
-    let mut w = platform::FileWriter::new(2);
-    let _ = w.write_str("_Unwind_Backtrace stub called\n");
-
-    0
-}
