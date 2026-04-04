@@ -94,8 +94,8 @@ fmt:
 
 install-headers: headers libs
 ifneq ($(filter %-seele,$(TARGET)),)
-	sudo mkdir -pv "$(DESTDIR)/system_include"
-	sudo cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/system_include"
+	sudo mkdir -pv "$(DESTDIR)/include"
+	sudo cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
 else
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
@@ -105,21 +105,21 @@ libs: $(LIBS)
 
 install-libs: headers libs
 ifneq ($(filter %-seele,$(TARGET)),)
-	sudo mkdir -pv "$(DESTDIR)/system_lib"
-	sudo cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/system_lib"
-	sudo cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/system_lib"
-	sudo ln -vnfs libc.so "$(DESTDIR)/system_lib/libc.so.6"
-	sudo cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/system_lib"
-	sudo ln -vnfs crt0.o "$(DESTDIR)/system_lib/crt1.o"
-	sudo cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/system_lib"
-	sudo cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/system_lib"
+	sudo mkdir -pv "$(DESTDIR)/lib_binaries"
+	sudo cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib_binaries"
+	sudo cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/lib_binaries"
+	sudo ln -vnfs libc.so "$(DESTDIR)/lib_binaries/libc.so.6"
+	sudo cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/lib_binaries"
+	sudo ln -vnfs crt0.o "$(DESTDIR)/lib_binaries/crt1.o"
+	sudo cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib_binaries"
+	sudo cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib_binaries"
 	sudo mkdir -pv "$(DESTDIR)/$(dir $(LD_SO_PATH))"
 	sudo cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
-	sudo cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/system_lib/libm.a"
+	sudo cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib_binaries/libm.a"
 	# Empty libraries for dl, pthread, and rt
-	sudo $(AR) -rcs "$(DESTDIR)/system_lib/libdl.a"
-	sudo $(AR) -rcs "$(DESTDIR)/system_lib/libpthread.a"
-	sudo $(AR) -rcs "$(DESTDIR)/system_lib/librt.a"
+	sudo $(AR) -rcs "$(DESTDIR)/lib_binaries/libdl.a"
+	sudo $(AR) -rcs "$(DESTDIR)/lib_binaries/libpthread.a"
+	sudo $(AR) -rcs "$(DESTDIR)/lib_binaries/librt.a"
 else
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib"

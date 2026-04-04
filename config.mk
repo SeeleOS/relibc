@@ -9,13 +9,13 @@ ifndef TARGET
 endif
 
 ifneq ($(filter %-seele,$(TARGET)),)
-	export DESTDIR ?= ../sysroot/misc/libs
+	export DESTDIR ?= ../sysroot/libs
 endif
 
 ifeq ($(TARGET),x86_64-seele)
 	export RUSTFLAGS:=$(RUSTFLAGS) -C relocation-model=pic
 	export CPPFLAGS:=$(CPPFLAGS) -fPIC
-	LD_SO_PATH=system_lib/ld64.so.1
+	LD_SO_PATH=lib_binaries/ld64.so.1
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
