@@ -26,7 +26,7 @@ use crate::{
         },
         sys_un::sockaddr_un,
     },
-    platform::{PalSocket, types::*},
+    platform::{Pal, PalSocket, types::*},
 };
 pub type socklen_t = u32;
 static SOCKETPAIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -243,6 +243,8 @@ impl PalSocket for Sys {
         }
 
         let path = next_socketpair_path()?;
+        sv[0] = -1;
+        sv[1] = -1;
 
         let listener = match e_raw(process_result(create_socket(
             domain as u64,
@@ -262,23 +264,44 @@ impl PalSocket for Sys {
                 base_kind as u64,
                 protocol as u64,
             )))? as c_int;
+            if let Err(err) = e_raw(process_result(socket_connect(first as u64, path.as_ptr()))) {
+                let _ = Sys::close(first);
+                return Err(err);
+            }
+            let second = match e_raw(process_result(socket_accept(listener as u64))) {
+                Ok(fd) => fd as c_int,
+                Err(err) => {
+                    let _ = Sys::close(first);
+                    return Err(err);
+                }
+            };
 
-            let cleanup_first = scopeguard::guard(first, |fd| {
-                let _ = Sys::close(fd);
-            });
+            if let Err(err) = apply_socket_flags(first, kind) {
+                let _ = Sys::close(first);
+                let _ = Sys::close(second);
+                return Err(err);
+            }
+            if let Err(err) = apply_socket_flags(second, kind) {
+                let _ = Sys::close(first);
+                let _ = Sys::close(second);
+                return Err(err);
+            }
 
-            e_raw(process_result(socket_connect(*cleanup_first as u64, path.as_ptr())))?;
-            let second = e_raw(process_result(socket_accept(listener as u64)))? as c_int;
-
-            apply_socket_flags(*cleanup_first, kind)?;
-            apply_socket_flags(second, kind)?;
-
-            sv[0] = *cleanup_first;
+            sv[0] = first;
             sv[1] = second;
-            scopeguard::ScopeGuard::into_inner(cleanup_first);
             Ok(())
         })();
 
+        if result.is_err() {
+            if sv[0] >= 0 {
+                let _ = Sys::close(sv[0]);
+                sv[0] = -1;
+            }
+            if sv[1] >= 0 {
+                let _ = Sys::close(sv[1]);
+                sv[1] = -1;
+            }
+        }
         let _ = e_raw(process_result(delete_file(path.as_ptr())));
         let _ = Sys::close(listener);
         result

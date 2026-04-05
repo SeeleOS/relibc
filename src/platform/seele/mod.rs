@@ -31,7 +31,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, O_EXCL, sys},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_CREAT, O_EXCL, O_NONBLOCK, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
@@ -46,6 +46,7 @@ use crate::{
         sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
+        sys_socket::constants::{AF_UNIX, SOCK_NONBLOCK, SOCK_STREAM},
         sys_time::timezone,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
@@ -1053,8 +1054,20 @@ impl Pal for Sys {
     }
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
-        let _ = (fildes.as_mut_ptr(), flags);
-        Sys::stub("PIPE2").map(|_| ())
+        if (flags & !(O_CLOEXEC | O_NONBLOCK)) != 0 {
+            return Err(Errno(EINVAL));
+        }
+
+        let socket_kind = SOCK_STREAM | if (flags & O_NONBLOCK) != 0 { SOCK_NONBLOCK } else { 0 };
+        let fds = unsafe { &mut *fildes.as_mut_ptr() };
+        <Sys as crate::platform::PalSocket>::socketpair(AF_UNIX, socket_kind, 0, fds)?;
+
+        if (flags & O_CLOEXEC) != 0 {
+            Self::fcntl(fds[0], F_SETFD, FD_CLOEXEC as c_ulonglong)?;
+            Self::fcntl(fds[1], F_SETFD, FD_CLOEXEC as c_ulonglong)?;
+        }
+
+        Ok(())
     }
 
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
