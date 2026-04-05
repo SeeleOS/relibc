@@ -2,7 +2,7 @@ use alloc::{slice, str};
 use seele_sys::{
     abi::{
         framebuffer::{FramebufferInfo as SeeleFramebufferInfo, FramebufferPixelFormat},
-        object::{ControlCommand, TerminalInfo as SeeleTerminalInfo, device_from_path},
+        object::{ControlCommand, SeekType, TerminalInfo as SeeleTerminalInfo, device_from_path},
     },
     misc::SystemInfo,
     permission::Permissions,
@@ -17,7 +17,7 @@ use seele_sys::{
         object::{
             clone_object, clone_object_to, configurate_object, control_object,
             get_framebuffer_info, get_terminal_info, mmap_object, open_device, read_object,
-            remove_object, set_terminal_info, write_object,
+            remove_object, seek_object, set_terminal_info, write_object,
         },
         update_mem_perms, wait_for_process_exit,
     },
@@ -36,6 +36,7 @@ use crate::{
             O_NONBLOCK, sys,
         },
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
+        stdio::SEEK_END,
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
             FBIOGET_VSCREENINFO, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, TCGETS, TCSETS, TCSETSF,
@@ -848,8 +849,18 @@ impl Pal for Sys {
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
-        let _ = (fildes, offset, whence);
-        Ok(Sys::stub("LSEEK")? as off_t)
+        let seek_type = match whence {
+            SEEK_SET => SeekType::Start,
+            SEEK_CUR => SeekType::Current,
+            SEEK_END => SeekType::End,
+        };
+
+        e_raw(process_result(seek_object(
+            fildes as u64,
+            offset,
+            seek_type,
+        )))
+        .map(|f| f as off_t)
     }
 
     fn mkdirat(dir_fildes: c_int, path: CStr, mode: mode_t) -> Result<()> {
