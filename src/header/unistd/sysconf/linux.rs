@@ -171,7 +171,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_CHILD_MAX => -1,
         _SC_NGROUPS_MAX => NGROUPS_MAX as c_long,
         // TODO: getrlimit
-        _SC_OPEN_MAX => -1,
+        _SC_OPEN_MAX => 9999,
         _SC_STREAM_MAX => -1,
         // TODO: limits.h
         _SC_TZNAME_MAX => -1,
