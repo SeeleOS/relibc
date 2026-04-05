@@ -115,6 +115,10 @@ pub const TIOCM_LOOP: c_ulong = 0x8000;
 pub const FBIOGET_VSCREENINFO: c_ulong = 0x4600;
 pub const FBIOPUT_VSCREENINFO: c_ulong = 0x4601;
 pub const FBIOGET_FSCREENINFO: c_ulong = 0x4602;
+pub const FBIOGETCMAP: c_ulong = 0x4604;
+pub const FBIOPUTCMAP: c_ulong = 0x4605;
+pub const FBIOPAN_DISPLAY: c_ulong = 0x4606;
+pub const FBIOBLANK: c_ulong = 0x4611;
 
 pub const FB_TYPE_PACKED_PIXELS: c_ulong = 0;
 pub const FB_VISUAL_TRUECOLOR: c_ulong = 2;

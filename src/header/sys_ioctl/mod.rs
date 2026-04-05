@@ -111,6 +111,17 @@ pub struct fb_var_screeninfo {
     pub reserved: [c_uint; 4],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct fb_cmap {
+    pub start: c_uint,
+    pub len: c_uint,
+    pub red: *mut c_ushort,
+    pub green: *mut c_ushort,
+    pub blue: *mut c_ushort,
+    pub transp: *mut c_ushort,
+}
+
 #[cfg(any(target_os = "linux", target_os = "seele"))]
 pub use self::linux::*;
 
