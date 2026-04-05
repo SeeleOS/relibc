@@ -1,9 +1,11 @@
-use alloc::ffi::CString;
+use alloc::{ffi::CString, format};
 use core::slice;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use seele_sys::{
     abi::object::{ControlCommand, ObjectFlags},
     syscalls::{
+        filesystem::delete_file,
         object::control_object,
         socket::{
             accept as socket_accept, bind as socket_bind, connect as socket_connect,
@@ -19,7 +21,7 @@ use crate::{
     header::{
         errno::{EAFNOSUPPORT, EINVAL},
         sys_socket::{
-            constants::{AF_UNIX, SOCK_CLOEXEC, SOCK_NONBLOCK},
+            constants::{AF_UNIX, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM},
             msghdr, sockaddr,
         },
         sys_un::sockaddr_un,
@@ -27,6 +29,8 @@ use crate::{
     platform::{PalSocket, types::*},
 };
 pub type socklen_t = u32;
+static SOCKETPAIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn unix_socket_path(address: *const sockaddr, address_len: socklen_t) -> Result<CString> {
     if address.is_null() {
         return Err(Errno(EINVAL));
@@ -69,6 +73,13 @@ fn apply_socket_flags(socket: c_int, kind: c_int) -> Result<()> {
     Ok(())
 }
 
+fn next_socketpair_path() -> Result<CString> {
+    let pid = Sys::getpid();
+    let tid = Sys::gettid();
+    let seq = SOCKETPAIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    CString::new(format!("/tmp/.relibc-pipe-{}-{}-{}", pid, tid, seq)).map_err(|_| Errno(EINVAL))
+}
+
 impl PalSocket for Sys {
     unsafe fn accept(
         socket: c_int,
@@ -89,7 +100,16 @@ impl PalSocket for Sys {
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
         let path = unix_socket_path(address, address_len)?;
-        e_raw(process_result(socket_bind(socket as u64, path.as_ptr()))).map(|_| ())
+        let result = e_raw(process_result(socket_bind(socket as u64, path.as_ptr()))).map(|_| ());
+        if let Err(ref err) = result {
+            Sys::print_stub_message(format_args!(
+                "seele bind failed: fd={} path={} errno={}\n",
+                socket,
+                path.as_c_str().to_str().unwrap_or("<invalid>"),
+                err.0
+            ));
+        }
+        result
     }
 
     unsafe fn connect(
@@ -133,7 +153,14 @@ impl PalSocket for Sys {
 
     fn listen(socket: c_int, backlog: c_int) -> Result<()> {
         let backlog = backlog.max(0) as u64;
-        e_raw(process_result(socket_listen(socket as u64, backlog))).map(|_| ())
+        let result = e_raw(process_result(socket_listen(socket as u64, backlog))).map(|_| ());
+        if let Err(ref err) = result {
+            Sys::print_stub_message(format_args!(
+                "seele listen failed: fd={} backlog={} errno={}\n",
+                socket, backlog, err.0
+            ));
+        }
+        result
     }
 
     unsafe fn recvfrom(
@@ -188,11 +215,21 @@ impl PalSocket for Sys {
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
         let base_kind = kind & !(SOCK_NONBLOCK | SOCK_CLOEXEC);
-        let socket = e_raw(process_result(create_socket(
+        let result = e_raw(process_result(create_socket(
             domain as u64,
             base_kind as u64,
             protocol as u64,
-        )))? as c_int;
+        )));
+        let socket = match result {
+            Ok(fd) => fd as c_int,
+            Err(err) => {
+                Sys::print_stub_message(format_args!(
+                    "seele socket failed: domain={} kind=0x{:x} base_kind=0x{:x} protocol={} errno={}\n",
+                    domain, kind, base_kind, protocol, err.0
+                ));
+                return Err(err);
+            }
+        };
 
         apply_socket_flags(socket, kind)?;
 
@@ -200,7 +237,50 @@ impl PalSocket for Sys {
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> Result<()> {
-        let _ = (domain, kind, protocol, sv);
-        Sys::stub("SOCKETPAIR").map(|_| ())
+        let base_kind = kind & !(SOCK_NONBLOCK | SOCK_CLOEXEC);
+        if domain != AF_UNIX || base_kind != SOCK_STREAM || protocol != 0 {
+            return Err(Errno(EINVAL));
+        }
+
+        let path = next_socketpair_path()?;
+
+        let listener = match e_raw(process_result(create_socket(
+            domain as u64,
+            base_kind as u64,
+            protocol as u64,
+        ))) {
+            Ok(fd) => fd as c_int,
+            Err(err) => return Err(err),
+        };
+
+        let result = (|| {
+            e_raw(process_result(socket_bind(listener as u64, path.as_ptr())))?;
+            e_raw(process_result(socket_listen(listener as u64, 1)))?;
+
+            let first = e_raw(process_result(create_socket(
+                domain as u64,
+                base_kind as u64,
+                protocol as u64,
+            )))? as c_int;
+
+            let cleanup_first = scopeguard::guard(first, |fd| {
+                let _ = Sys::close(fd);
+            });
+
+            e_raw(process_result(socket_connect(*cleanup_first as u64, path.as_ptr())))?;
+            let second = e_raw(process_result(socket_accept(listener as u64)))? as c_int;
+
+            apply_socket_flags(*cleanup_first, kind)?;
+            apply_socket_flags(second, kind)?;
+
+            sv[0] = *cleanup_first;
+            sv[1] = second;
+            scopeguard::ScopeGuard::into_inner(cleanup_first);
+            Ok(())
+        })();
+
+        let _ = e_raw(process_result(delete_file(path.as_ptr())));
+        let _ = Sys::close(listener);
+        result
     }
 }

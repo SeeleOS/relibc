@@ -34,15 +34,15 @@ use crate::{
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, O_EXCL, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{
-            FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO,
-            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_fix_screeninfo,
-            fb_var_screeninfo, winsize,
+            FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
+            FBIOGET_VSCREENINFO, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, TCGETS, TCSETS, TCSETSF,
+            TCSETSW, TIOCGWINSZ, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
             PROT_NONE, PROT_READ, PROT_WRITE,
         },
-        sys_resource::{rlimit, rusage},
+        sys_resource::{rlimit, rusage, RLIM_INFINITY, RLIMIT_NOFILE},
         sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
@@ -132,6 +132,47 @@ pub fn e_raw(sys: usize) -> Result<usize> {
 pub struct Sys;
 
 impl Sys {
+    fn current_linux_fb_var(fd: c_int) -> Result<fb_var_screeninfo> {
+        let mut info = SeeleFramebufferInfo::default();
+        let result = e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)));
+        if let Err(ref err) = result {
+            Self::print_stub_message(format_args!(
+                "seele fb ioctl failed: fd={} req=current_fb_var errno={}\n",
+                fd, err.0
+            ));
+        }
+        result?;
+
+        let mut var = fb_var_screeninfo::default();
+        Self::fill_linux_fb_var(info, &mut var);
+        Ok(var)
+    }
+
+    fn fb_var_matches_current(requested: &fb_var_screeninfo, current: &fb_var_screeninfo) -> bool {
+        requested.xres == current.xres
+            && requested.yres == current.yres
+            && requested.xres_virtual == current.xres_virtual
+            && requested.yres_virtual == current.yres_virtual
+            && requested.xoffset == current.xoffset
+            && requested.yoffset == current.yoffset
+            && requested.bits_per_pixel == current.bits_per_pixel
+            && requested.grayscale == 0
+            && requested.nonstd == 0
+            && requested.rotate == 0
+            && requested.red.offset == current.red.offset
+            && requested.red.length == current.red.length
+            && requested.red.msb_right == current.red.msb_right
+            && requested.green.offset == current.green.offset
+            && requested.green.length == current.green.length
+            && requested.green.msb_right == current.green.msb_right
+            && requested.blue.offset == current.blue.offset
+            && requested.blue.length == current.blue.length
+            && requested.blue.msb_right == current.blue.msb_right
+            && requested.transp.offset == current.transp.offset
+            && requested.transp.length == current.transp.length
+            && requested.transp.msb_right == current.transp.msb_right
+    }
+
     fn framebuffer_bitfields(
         pixel_format: FramebufferPixelFormat,
     ) -> (fb_bitfield, fb_bitfield, fb_bitfield) {
@@ -227,7 +268,14 @@ impl Sys {
                     return Err(Errno(EINVAL));
                 }
                 let mut info = SeeleFramebufferInfo::default();
-                e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)))?;
+                let result = e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)));
+                if let Err(ref err) = result {
+                    Self::print_stub_message(format_args!(
+                        "seele fb ioctl failed: fd={} req=FBIOGET_FSCREENINFO errno={}\n",
+                        fd, err.0
+                    ));
+                }
+                result?;
                 Self::fill_linux_fb_fix(info, unsafe { &mut *out.cast::<fb_fix_screeninfo>() });
                 Ok(0)
             }
@@ -235,11 +283,50 @@ impl Sys {
                 if out.is_null() {
                     return Err(Errno(EINVAL));
                 }
-                let mut info = SeeleFramebufferInfo::default();
-                e_raw(process_result(get_framebuffer_info(fd as u64, &mut info)))?;
-                Self::fill_linux_fb_var(info, unsafe { &mut *out.cast::<fb_var_screeninfo>() });
+                let current = Self::current_linux_fb_var(fd)?;
+                *(unsafe { &mut *out.cast::<fb_var_screeninfo>() }) = current;
                 Ok(0)
             }
+            FBIOPUT_VSCREENINFO => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+                let requested = unsafe { &mut *out.cast::<fb_var_screeninfo>() };
+                let current = Self::current_linux_fb_var(fd)?;
+                if !Self::fb_var_matches_current(requested, &current) {
+                    Self::print_stub_message(format_args!(
+                        "seele fb ioctl rejected mode set: fd={} {}x{} virt={}x{} off={}x{} bpp={}\n",
+                        fd,
+                        requested.xres,
+                        requested.yres,
+                        requested.xres_virtual,
+                        requested.yres_virtual,
+                        requested.xoffset,
+                        requested.yoffset,
+                        requested.bits_per_pixel
+                    ));
+                    return Err(Errno(EINVAL));
+                }
+                *requested = current;
+                Ok(0)
+            }
+            FBIOPAN_DISPLAY => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+                let requested = unsafe { &mut *out.cast::<fb_var_screeninfo>() };
+                let current = Self::current_linux_fb_var(fd)?;
+                if requested.xoffset != 0 || requested.yoffset != 0 {
+                    Self::print_stub_message(format_args!(
+                        "seele fb ioctl rejected pan: fd={} off={}x{}\n",
+                        fd, requested.xoffset, requested.yoffset
+                    ));
+                    return Err(Errno(EINVAL));
+                }
+                *requested = current;
+                Ok(0)
+            }
+            FBIOBLANK => Ok(0),
             TCGETS => {
                 // Makes a new blank Seele terminal info
                 let mut info = SeeleTerminalInfo::default();
@@ -662,8 +749,22 @@ impl Pal for Sys {
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
-        let _ = (resource, rlim.as_mut_ptr());
-        Sys::stub("GETRLIMIT").map(|_| ())
+        match resource {
+            RLIMIT_NOFILE => {
+                rlim.write(rlimit {
+                    rlim_cur: 1024,
+                    rlim_max: 1024,
+                });
+                Ok(())
+            }
+            _ => {
+                rlim.write(rlimit {
+                    rlim_cur: RLIM_INFINITY,
+                    rlim_max: RLIM_INFINITY,
+                });
+                Ok(())
+            }
+        }
     }
 
     fn getresgid(
@@ -840,13 +941,20 @@ impl Pal for Sys {
                 return Err(Errno(EINVAL));
             }
 
-            return e_raw(process_result(mmap_object(
+            let result = e_raw(process_result(mmap_object(
                 fildes as u64,
                 len.div_ceil(4096) as u64,
                 off as u64,
                 permissions,
             )))
             .map(|r| r as *mut c_void);
+            if let Err(ref err) = result {
+                Self::print_stub_message(format_args!(
+                    "seele mmap failed: fd={} len={} off={} prot=0x{:x} flags=0x{:x} errno={}\n",
+                    fildes, len, off, prot, flags, err.0
+                ));
+            }
+            return result;
         }
 
         // Just allocates memory if its a anonymous map
