@@ -88,9 +88,24 @@ pub struct fb_var_screeninfo {
     pub reserved: [c_uint; 4],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct fb_cmap {
+    pub start: c_uint,
+    pub len: c_uint,
+    pub red: *mut c_ushort,
+    pub green: *mut c_ushort,
+    pub blue: *mut c_ushort,
+    pub transp: *mut c_ushort,
+}
+
 pub const FBIOGET_VSCREENINFO: c_ulong = 0x4600;
 pub const FBIOPUT_VSCREENINFO: c_ulong = 0x4601;
 pub const FBIOGET_FSCREENINFO: c_ulong = 0x4602;
+pub const FBIOGETCMAP: c_ulong = 0x4604;
+pub const FBIOPUTCMAP: c_ulong = 0x4605;
+pub const FBIOPAN_DISPLAY: c_ulong = 0x4606;
+pub const FBIOBLANK: c_ulong = 0x4611;
 
 pub const FB_TYPE_PACKED_PIXELS: c_uint = 0;
 pub const FB_TYPE_PLANES: c_uint = 1;

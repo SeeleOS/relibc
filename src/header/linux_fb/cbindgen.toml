@@ -9,4 +9,4 @@ cpp_compat = true
 prefix_with_name = true
 
 [export]
-include = ["fb_bitfield", "fb_fix_screeninfo", "fb_var_screeninfo"]
+include = ["fb_bitfield", "fb_fix_screeninfo", "fb_var_screeninfo", "fb_cmap"]
