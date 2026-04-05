@@ -852,16 +852,17 @@ impl Pal for Sys {
         let target = match whence {
             SEEK_SET => offset,
             SEEK_CUR => {
-                let current = e_raw(process_result(seek_object(fildes as u64, 0, SeekType::Current)))?
-                    as off_t;
+                let current = e_raw(process_result(seek_object(
+                    fildes as u64,
+                    0,
+                    SeekType::Current,
+                )))? as off_t;
                 current.checked_add(offset).ok_or(Errno(EOVERFLOW))?
             }
             SEEK_END => {
                 let mut stat = stat::default();
                 Self::fstat(fildes, Out::from_mut(&mut stat))?;
-                stat.st_size
-                    .checked_add(offset)
-                    .ok_or(Errno(EOVERFLOW))?
+                stat.st_size.checked_add(offset).ok_or(Errno(EOVERFLOW))?
             }
             _ => return Err(Errno(EINVAL)),
         };
@@ -1140,9 +1141,10 @@ impl Pal for Sys {
         stack: *mut usize,
         _os_specific: &mut OsSpecific,
     ) -> Result<crate::pthread::OsTid> {
-        let _ = (stack, _os_specific);
-        let tid = Sys::stub("CLONE")?;
-        Ok(crate::pthread::OsTid { thread_id: tid })
+        use seele_sys::syscalls::misc::thread_clone;
+
+        let result = e_raw(process_result(thread_clone(stack as u64)))?;
+        Ok(crate::pthread::OsTid { thread_id: result })
     }
 
     #[cfg(target_arch = "aarch64")]
