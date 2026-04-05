@@ -31,7 +31,10 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_CREAT, O_EXCL, O_NONBLOCK, sys},
+        fcntl::{
+            AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_CREAT, O_EXCL,
+            O_NONBLOCK, sys,
+        },
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
@@ -42,11 +45,11 @@ use crate::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
             PROT_NONE, PROT_READ, PROT_WRITE,
         },
-        sys_resource::{rlimit, rusage, RLIM_INFINITY, RLIMIT_NOFILE},
+        sys_resource::{RLIM_INFINITY, RLIMIT_NOFILE, rlimit, rusage},
         sys_select::timeval,
+        sys_socket::constants::{AF_UNIX, SOCK_NONBLOCK, SOCK_STREAM},
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
-        sys_socket::constants::{AF_UNIX, SOCK_NONBLOCK, SOCK_STREAM},
         sys_time::timezone,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
@@ -1058,7 +1061,12 @@ impl Pal for Sys {
             return Err(Errno(EINVAL));
         }
 
-        let socket_kind = SOCK_STREAM | if (flags & O_NONBLOCK) != 0 { SOCK_NONBLOCK } else { 0 };
+        let socket_kind = SOCK_STREAM
+            | if (flags & O_NONBLOCK) != 0 {
+                SOCK_NONBLOCK
+            } else {
+                0
+            };
         let fds = unsafe { &mut *fildes.as_mut_ptr() };
         <Sys as crate::platform::PalSocket>::socketpair(AF_UNIX, socket_kind, 0, fds)?;
 
@@ -1193,13 +1201,11 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        let _ = (rgid, egid, sgid);
-        Sys::stub("SETRESGID").map(|_| ())
+        Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        let _ = (ruid, euid, suid);
-        Sys::stub("SETRESUID").map(|_| ())
+        Ok(())
     }
 
     fn setsid() -> Result<c_int> {
