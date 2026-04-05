@@ -30,7 +30,7 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS},
+        errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS, EOVERFLOW},
         fcntl::{
             AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_CREAT, O_EXCL,
             O_NONBLOCK, sys,
@@ -849,17 +849,31 @@ impl Pal for Sys {
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
-        let seek_type = match whence {
-            SEEK_SET => SeekType::Start,
-            SEEK_CUR => SeekType::Current,
-            SEEK_END => SeekType::End,
+        let target = match whence {
+            SEEK_SET => offset,
+            SEEK_CUR => {
+                let current = e_raw(process_result(seek_object(fildes as u64, 0, SeekType::Current)))?
+                    as off_t;
+                current.checked_add(offset).ok_or(Errno(EOVERFLOW))?
+            }
+            SEEK_END => {
+                let mut stat = stat::default();
+                Self::fstat(fildes, Out::from_mut(&mut stat))?;
+                stat.st_size
+                    .checked_add(offset)
+                    .ok_or(Errno(EOVERFLOW))?
+            }
             _ => return Err(Errno(EINVAL)),
         };
 
+        if target < 0 {
+            return Err(Errno(EINVAL));
+        }
+
         e_raw(process_result(seek_object(
             fildes as u64,
-            offset,
-            seek_type,
+            target,
+            SeekType::Start,
         )))
         .map(|f| f as off_t)
     }
