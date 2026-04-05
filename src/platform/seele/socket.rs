@@ -20,13 +20,13 @@ use crate::{
         errno::{EAFNOSUPPORT, EINVAL},
         sys_socket::{
             constants::{AF_UNIX, SOCK_CLOEXEC, SOCK_NONBLOCK},
-            msghdr, sockaddr, socklen_t,
+            msghdr, sockaddr,
         },
         sys_un::sockaddr_un,
     },
     platform::{PalSocket, types::*},
 };
-
+pub type socklen_t = u32;
 fn unix_socket_path(address: *const sockaddr, address_len: socklen_t) -> Result<CString> {
     if address.is_null() {
         return Err(Errno(EINVAL));

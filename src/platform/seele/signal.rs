@@ -112,6 +112,11 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
+    fn alarm(seconds: c_uint) -> c_uint {
+        Sys::stub("ALARM");
+        0
+    }
+
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
         let _ = (pid, sig, val);
         let _info = siginfo_t {

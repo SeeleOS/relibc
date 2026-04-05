@@ -309,6 +309,7 @@ impl Sys {
     // fn times(out: *mut tms) -> clock_t {
     //     unsafe { syscall!(TIMES, out) as clock_t }
     // }
+    //
 
     pub(crate) fn sigprocmask_stub(
         how: c_int,
@@ -363,6 +364,10 @@ impl Pal for Sys {
             0,
         )))
         .map(|_| ())
+    }
+
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        Sys::stub("OPENAT").map(|a| a as c_int)
     }
 
     #[cfg(target_arch = "aarch64")]
