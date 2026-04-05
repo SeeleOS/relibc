@@ -39,8 +39,9 @@ use crate::{
         stdio::SEEK_END,
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
-            FBIOGET_VSCREENINFO, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, TCGETS, TCSETS, TCSETSF,
-            TCSETSW, TIOCGWINSZ, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, winsize,
+            FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO,
+            FBIOPUTCMAP, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_cmap,
+            fb_fix_screeninfo, fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
@@ -248,6 +249,32 @@ impl Sys {
         out.width = info.width as c_uint;
     }
 
+    fn fill_linux_fb_cmap(out: &mut fb_cmap) {
+        let len = out.len as usize;
+
+        if len == 0 {
+            return;
+        }
+
+        // Seele framebuffers are exposed as TrueColor only, so there is no
+        // programmable palette to read back. Return an all-zero colormap to
+        // satisfy Linux fbdev callers that probe this ioctl.
+        unsafe {
+            if !out.red.is_null() {
+                ptr::write_bytes(out.red, 0, len);
+            }
+            if !out.green.is_null() {
+                ptr::write_bytes(out.green, 0, len);
+            }
+            if !out.blue.is_null() {
+                ptr::write_bytes(out.blue, 0, len);
+            }
+            if !out.transp.is_null() {
+                ptr::write_bytes(out.transp, 0, len);
+            }
+        }
+    }
+
     fn print_stub_message(args: core::fmt::Arguments<'_>) {
         use core::fmt::Write;
 
@@ -329,6 +356,23 @@ impl Sys {
                     return Err(Errno(EINVAL));
                 }
                 *requested = current;
+                Ok(0)
+            }
+            FBIOGETCMAP => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+                Self::fill_linux_fb_cmap(unsafe { &mut *out.cast::<fb_cmap>() });
+                Ok(0)
+            }
+            FBIOPUTCMAP => {
+                if out.is_null() {
+                    return Err(Errno(EINVAL));
+                }
+
+                // Seele framebuffers are TrueColor-only, so userspace palette
+                // updates have no effect. Report success for fbdev consumers
+                // that expect this ioctl to exist on Linux framebuffers.
                 Ok(0)
             }
             FBIOBLANK => Ok(0),
