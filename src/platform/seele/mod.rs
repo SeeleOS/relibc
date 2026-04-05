@@ -388,7 +388,7 @@ impl Pal for Sys {
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         let _ = (path, mode);
-        Sys::stub("FCHMODAT").map(|_| ())
+        Ok(())
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -476,12 +476,12 @@ impl Pal for Sys {
 
     fn fchmod(fildes: c_int, mode: mode_t) -> Result<()> {
         let _ = (fildes, mode);
-        Sys::stub("FCHMOD").map(|_| ())
+        Ok(())
     }
 
     fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
         let _ = (dirfd, path, mode, flags);
-        Sys::stub("FCHMODAT").map(|_| ())
+        Ok(())
     }
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
