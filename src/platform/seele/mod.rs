@@ -30,8 +30,8 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::{EAGAIN, EINVAL, EIO, ENOSYS},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, sys},
+        errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, O_CREAT, O_EXCL, sys},
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO,
@@ -929,6 +929,10 @@ impl Pal for Sys {
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        if (oflag & O_CREAT) != 0 && (oflag & O_EXCL) != 0 && Self::access(path, F_OK).is_ok() {
+            return Err(Errno(EEXIST));
+        }
+
         if let Some(device) = device_from_path(path.to_str().map_err(|_| Errno(EINVAL))?) {
             return e_raw(process_result(open_device(device))).map(|fd| fd as c_int);
         }
