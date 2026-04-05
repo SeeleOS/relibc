@@ -51,7 +51,7 @@ pub struct Tcb {
     pub generic: GenericTcb<OsSpecific>,
     /// Pointer to a list of initial TLS data
     pub masters_ptr: *mut Master,
-    /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
+    /// Size of the masters list in bytes (multiple of `mem::size_of::<Master>()`)
     pub masters_len: usize,
     /// Index of last copied Master
     pub num_copied_masters: usize,
@@ -152,37 +152,36 @@ impl Tcb {
     /// Copy data from masters
     pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
-        if let Some(tls) = unsafe { self.tls() } {
-            if let Some(masters) = self.masters() {
-                for master in masters
-                    .iter()
-                    .skip(self.num_copied_masters)
-                    .filter(|master| master.image_size != 0)
-                {
-                    let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
-                        // x86{_64} TLS layout is backwards
-                        self.tls_len - master.offset
-                            ..self.tls_len - master.offset + master.image_size
-                    } else {
-                        master.offset..master.offset + master.image_size
-                    };
-                    if let Some(tls_data) = tls.get_mut(range) {
-                        let data = unsafe { master.data() };
-                        #[cfg(feature = "trace_tls")]
-                        log::trace!(
-                            "tls master: {:p}, {:#x}: {:p}, {:#x}",
-                            data.as_ptr(),
-                            data.len(),
-                            tls_data.as_mut_ptr(),
-                            tls_data.len()
-                        );
-                        tls_data.copy_from_slice(data);
-                    } else {
-                        return Err(DlError::Malformed);
-                    }
+        if let Some(tls) = unsafe { self.tls() }
+            && let Some(masters) = self.masters()
+        {
+            for master in masters
+                .iter()
+                .skip(self.num_copied_masters)
+                .filter(|master| master.image_size != 0)
+            {
+                let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                    // x86{_64} TLS layout is backwards
+                    self.tls_len - master.offset..self.tls_len - master.offset + master.image_size
+                } else {
+                    master.offset..master.offset + master.image_size
+                };
+                if let Some(tls_data) = tls.get_mut(range) {
+                    let data = unsafe { master.data() };
+                    #[cfg(feature = "trace_tls")]
+                    log::trace!(
+                        "tls master: {:p}, {:#x}: {:p}, {:#x}",
+                        data.as_ptr(),
+                        data.len(),
+                        tls_data.as_mut_ptr(),
+                        tls_data.len()
+                    );
+                    tls_data.copy_from_slice(data);
+                } else {
+                    return Err(DlError::Malformed);
                 }
-                self.num_copied_masters = masters.len();
             }
+            self.num_copied_masters = masters.len();
         }
 
         Ok(())

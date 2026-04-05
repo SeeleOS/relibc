@@ -66,8 +66,8 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     };
 
     let mut closed = 0;
-    for i in 0..fds.len() {
-        let pfd = &mut fds[i];
+    for (i, fd) in fds.iter_mut().enumerate() {
+        let pfd = fd;
 
         pfd.revents = 0;
 
@@ -88,7 +88,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
             }
         }
 
-        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
             if platform::ERRNO.get() == EBADF {
                 pfd.revents |= POLLNVAL;
                 closed += 1;

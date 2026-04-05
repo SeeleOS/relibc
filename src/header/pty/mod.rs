@@ -31,7 +31,7 @@ pub unsafe extern "C" fn openpty(
 ) -> c_int {
     let mut tmp_name = [0; limits::PATH_MAX];
     let name = if !namep.is_null() {
-        unsafe { slice::from_raw_parts_mut(namep as *mut u8, limits::PATH_MAX) }
+        unsafe { slice::from_raw_parts_mut(namep.cast::<u8>(), limits::PATH_MAX) }
     } else {
         &mut tmp_name
     };
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn openpty(
     unsafe { *amaster = master };
     unsafe { *aslave = slave };
 
-    return 0;
+    0
 }
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
@@ -72,13 +72,13 @@ pub unsafe extern "C" fn forkpty(
     let mut set = signal::sigset_t::default();
     let mut oldset = signal::sigset_t::default();
 
-    if unsafe { openpty(&mut m, &mut s, name, tio, ws) } < 0 {
+    if unsafe { openpty(&raw mut m, &raw mut s, name, tio, ws) } < 0 {
         return -1;
     }
 
-    unsafe { signal::sigfillset(&mut set) };
-    unsafe { signal::pthread_sigmask(signal::SIG_BLOCK, &mut set, &mut oldset) };
-    unsafe { pthread::pthread_setcancelstate(pthread::PTHREAD_CANCEL_DISABLE, &mut cs) };
+    unsafe { signal::sigfillset(&raw mut set) };
+    unsafe { signal::pthread_sigmask(signal::SIG_BLOCK, &raw const set, &raw mut oldset) };
+    unsafe { pthread::pthread_setcancelstate(pthread::PTHREAD_CANCEL_DISABLE, &raw mut cs) };
 
     if unsafe { unistd::pipe2(p.as_mut_ptr(), fcntl::O_CLOEXEC) } != 0 {
         unistd::close(s);
@@ -99,7 +99,9 @@ pub unsafe extern "C" fn forkpty(
             }
             unistd::close(p[1]);
             unsafe { pthread::pthread_setcancelstate(cs, ptr::null_mut()) };
-            unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &mut oldset, ptr::null_mut()) };
+            unsafe {
+                signal::pthread_sigmask(signal::SIG_SETMASK, &raw const oldset, ptr::null_mut())
+            };
             return 0;
         }
 
@@ -109,13 +111,13 @@ pub unsafe extern "C" fn forkpty(
         if unsafe {
             unistd::read(
                 p[0],
-                &mut ec as *mut c_int as *mut c_void,
+                ptr::from_mut::<c_int>(&mut ec).cast::<c_void>(),
                 mem::size_of::<c_int>(),
             )
         } > 0
         {
             let mut status = 0;
-            unsafe { sys_wait::waitpid(pid, &mut status, 0) };
+            unsafe { sys_wait::waitpid(pid, &raw mut status, 0) };
             pid = -1;
             platform::ERRNO.set(ec);
         }
@@ -127,6 +129,6 @@ pub unsafe extern "C" fn forkpty(
         unistd::close(m);
     }
     unsafe { pthread::pthread_setcancelstate(cs, ptr::null_mut()) };
-    unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &mut oldset, ptr::null_mut()) };
+    unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &raw const oldset, ptr::null_mut()) };
     pid
 }

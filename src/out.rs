@@ -94,7 +94,7 @@ impl<'a, T> Out<'a, [T]> {
         } else {
             ptr
         };
-        unsafe { Self::nonnull(core::slice::from_raw_parts_mut(ptr, len)) }
+        unsafe { Self::nonnull(core::ptr::slice_from_raw_parts_mut(ptr, len)) }
     }
     pub fn len(&self) -> usize {
         self.ptr.as_ptr().len()
@@ -229,5 +229,3 @@ impl<'a, T: ?Sized> Out<'a, T> {
         unsafe { Out::nonnull(self.as_mut_ptr()) }
     }
 }
-
-// TODO: unit tests

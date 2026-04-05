@@ -9,11 +9,11 @@ use core::cell::UnsafeCell;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use generic_rt::ExpectTlsFree; // not used on aarch64 or riscv64
 use generic_rt::GenericTcb;
+use redox_protocols::protocol::ProcMeta;
 use syscall::Sigcontrol;
 
 use self::{
     proc::{FdGuard, FdGuardUpper, STATIC_PROC_INFO},
-    protocol::ProcMeta,
     sync::Mutex,
 };
 
@@ -45,7 +45,6 @@ pub mod proc;
 #[path = "../../src/platform/auxv_defs.rs"]
 pub mod auxv_defs;
 
-pub mod protocol;
 pub mod signal;
 pub mod sync;
 pub mod sys;
@@ -265,15 +264,14 @@ pub fn current_proc_fd() -> &'static FdGuardUpper {
     info.proc_fd.as_ref().unwrap()
 }
 #[inline]
-pub fn current_namespace_fd() -> usize {
+pub fn current_namespace_fd() -> syscall::Result<usize> {
     DYNAMIC_PROC_INFO
         .lock()
         .ns_fd
         .as_ref()
         .map(|g| g.as_raw_fd())
-        .unwrap_or(usize::MAX)
+        .ok_or(syscall::Error::new(syscall::ENOENT))
 }
-
 struct ChildHookCommonArgs {
     new_thr_fd: FdGuard,
     new_proc_fd: Option<FdGuard>,

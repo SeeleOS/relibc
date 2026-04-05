@@ -6,7 +6,8 @@ use core::{
 
 use ioslice::IoSlice;
 use syscall::{
-    CallFlags, EINVAL, ERESTART, TimeSpec,
+    CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
+    data::StdFsCallMeta,
     error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
 
@@ -14,11 +15,13 @@ use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
     proc::{FdGuard, FdGuardUpper},
-    protocol::{NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
 };
 use alloc::vec::Vec;
+use redox_protocols::protocol::{
+    NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
+};
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -385,7 +388,7 @@ pub fn getens() -> Result<usize> {
     read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens as usize)
 }
 pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
-    if buf.len() < size_of::<crate::protocol::ProcMeta>() {
+    if buf.len() < size_of::<redox_protocols::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
     }
     proc_call(
@@ -445,7 +448,7 @@ pub fn setns(fd: usize) -> Option<FdGuardUpper> {
     old_fd_guard
 }
 pub fn getns() -> Result<usize> {
-    let cur_ns = crate::current_namespace_fd();
+    let cur_ns = crate::current_namespace_fd()?;
     if cur_ns == usize::MAX {
         Err(Error::new(ENODEV))
     } else {
@@ -458,7 +461,25 @@ pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     unsafe {
         syscall::syscall5(
             syscall::SYS_OPENAT,
-            crate::current_namespace_fd(),
+            crate::current_namespace_fd()?,
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
+}
+pub fn openat<T: AsRef<str>>(
+    fd: usize,
+    path: T,
+    flags: usize,
+    fcntl_flags: usize,
+) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            fd,
             path.as_ptr() as usize,
             path.len(),
             flags,
@@ -471,7 +492,7 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     unsafe {
         syscall::syscall4(
             syscall::SYS_UNLINKAT,
-            crate::current_namespace_fd(),
+            crate::current_namespace_fd()?,
             path.as_ptr() as usize,
             path.len(),
             flags,
@@ -487,7 +508,7 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
+    FdGuard::new(syscall::dup(crate::current_namespace_fd()?, &buf)?).to_upper()
 }
 pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
     let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
@@ -496,4 +517,16 @@ pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<
     let cap_bytes = cap_fd.to_ne_bytes();
     ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
     Ok(())
+}
+pub fn std_fs_call_ro(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_ro(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_wo(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
+    std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0))
 }

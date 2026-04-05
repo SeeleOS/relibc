@@ -13,7 +13,7 @@ use object::{
 
 use self::tcb::{Master, Tcb};
 use crate::{
-    header::sys_auxv::AT_NULL,
+    header::sys_auxv::{AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM},
     platform::{Pal, Sys},
     start::Stack,
 };
@@ -58,9 +58,9 @@ pub fn static_init(
         }
 
         match kind {
-            3 => phdr_opt = Some(value),
-            4 => phent_opt = Some(value),
-            5 => phnum_opt = Some(value),
+            AT_PHDR => phdr_opt = Some(value),
+            AT_PHENT => phent_opt = Some(value),
+            AT_PHNUM => phnum_opt = Some(value),
             _ => (),
         }
 
@@ -102,11 +102,11 @@ pub fn static_init(
         let page_size = Sys::getpagesize();
         let voff = p_vaddr % page_size;
         // let vaddr = ph.p_vaddr as usize - voff;
-        let vsize = ((p_memsz + voff + page_size - 1) / page_size) * page_size;
+        let vsize = (p_memsz + voff).div_ceil(page_size) * page_size;
 
         if p_type == elf::PT_TLS {
             let valign = if p_align > 0 {
-                ((p_memsz + (p_align - 1)) / p_align) * p_align
+                p_memsz.div_ceil(p_align) * p_align
             } else {
                 p_memsz
             };
@@ -202,10 +202,10 @@ pub unsafe fn init(
 }
 
 pub unsafe fn fini() {
-    if let Some(tcb) = unsafe { Tcb::current() } {
-        if !tcb.linker_ptr.is_null() {
-            let linker = unsafe { (*tcb.linker_ptr).lock() };
-            linker.fini();
-        }
+    if let Some(tcb) = unsafe { Tcb::current() }
+        && !tcb.linker_ptr.is_null()
+    {
+        let linker = unsafe { (*tcb.linker_ptr).lock() };
+        linker.fini();
     }
 }

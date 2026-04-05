@@ -1,4 +1,4 @@
-//! Helper functions for random() and friends, see https://pubs.opengroup.org/onlinepubs/7908799/xsh/initstate.html
+//! Helper functions for random() and friends, see <https://pubs.opengroup.org/onlinepubs/9799919799/functions/initstate.html>.
 // Ported from musl's implementation (src/prng/random.c)
 
 use crate::{
@@ -65,7 +65,7 @@ impl State {
     pub unsafe fn seed(&mut self, seed: c_uint) {
         unsafe { self.ensure_x_ptr_init() };
 
-        let mut s = seed as u64;
+        let mut s = u64::from(seed);
 
         if self.n == 0 {
             unsafe { *self.x_ptr = (s as u32).to_ne_bytes() };

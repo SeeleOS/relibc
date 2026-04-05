@@ -142,8 +142,8 @@ mount:
 
 install-tests: tests
 	$(MAKE) -C tests
-	mkdir -p "$(DESTDIR)/bin/relibc-tests"
-	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
+	mkdir -p "$(DESTDIR)/relibc-tests"
+	cp -vr tests/build_$(TARGET)/* "$(DESTDIR)/relibc-tests/"
 
 install: mount install-headers install-libs
 	sync
@@ -203,9 +203,7 @@ $(BUILD)/$(PROFILE)/librt.a:
 	$(AR) -rcs "$@"
 endif
 
-# Debug targets
-
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -213,6 +211,8 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
+
+# Debug targets
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
@@ -237,15 +237,6 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 # Release targets
-
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	echo "create $@" > "$@.mri"
-	for lib in $^; do\
-		echo "addlib $$lib" >> "$@.mri"; \
-	done
-	echo "save" >> "$@.mri"
-	echo "end" >> "$@.mri"
-	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)

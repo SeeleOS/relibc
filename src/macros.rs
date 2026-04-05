@@ -47,7 +47,7 @@ pub const ISSUE_URL: &str = "https://gitlab.redox-os.org/redox-os/relibc/-/issue
 macro_rules! todo_skip {
     ($issue:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            log::info!("TODO ({}{}): {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
+            log::info!("TODO ({}{}): {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
         } else {
             log::info!("TODO: {}", format_args!($($arg)*))
         }
@@ -59,7 +59,7 @@ macro_rules! todo_skip {
 macro_rules! todo_error {
     ($issue:expr, $err:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            log::error!("TODO ({}{}): {}: {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
+            log::error!("TODO ({}{}): {}: {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
         } else {
             log::error!("TODO: {}: {:?}", format_args!($($arg)*), $err)
         }
@@ -71,7 +71,7 @@ macro_rules! todo_error {
 macro_rules! todo_panic {
     ($issue:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            todo!("{} ({}{})", format_args!($($arg)*), crate::macros::ISSUE_URL, $issue)
+            todo!("{} ({}{})", format_args!($($arg)*), $crate::macros::ISSUE_URL, $issue)
         } else {
             todo!("{}", format_args!($($arg)*))
         }
@@ -118,7 +118,85 @@ macro_rules! trace_expr {
 }
 
 #[macro_export]
+macro_rules! skipws {
+    ($ptr:expr) => {
+        while isspace(unsafe { *$ptr }) != 0 {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! strtou_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {
+        strtou_impl!($type, $ptr, $base, false)
+    };
+    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
+        let mut base = $base;
+
+        if (base == 16 || base == 0)
+            && unsafe { *$ptr } == '0' as wchar_t
+            && (unsafe { *$ptr.add(1) } == 'x' as wchar_t
+                || unsafe { *$ptr.add(1) } == 'X' as wchar_t)
+        {
+            $ptr = unsafe { $ptr.add(2) };
+            base = 16;
+        }
+
+        if base == 0 {
+            base = if unsafe { *$ptr } == '0' as wchar_t {
+                8
+            } else {
+                10
+            };
+        };
+
+        let mut result: $type = 0;
+        while let Some(digit) =
+            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
+        {
+            let new = result.checked_mul(base as $type).and_then(|result| {
+                if $negative {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_sub(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_sub($type::from(digit))
+                    }
+                } else {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_add(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_add($type::from(digit))
+                    }
+                }
+            });
+            result = match new {
+                Some(new) => new,
+                None => {
+                    platform::ERRNO.set(ERANGE);
+                    return !0;
+                }
+            };
+
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        result
+    }};
+}
+
+#[macro_export]
 macro_rules! strto_impl {
+    // this variant is used by inttypes and stdlib
     (
         $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
     ) => {{
@@ -134,7 +212,7 @@ macro_rules! strto_impl {
                 // "stores the address of the first invalid character in *endptr"
                 // so obviously it doesn't want us to clone it.
                 unsafe {
-                    *$endptr = $s.offset(idx) as *mut _;
+                    *$endptr = $s.offset(idx).cast_mut();
                 }
             }
         };
@@ -145,7 +223,7 @@ macro_rules! strto_impl {
         };
 
         // only valid bases are 2 through 36
-        if $base != 0 && ($base < 2 || $base > 36) {
+        if $base != 0 && !(2..=36).contains(&$base) {
             invalid_input();
             return 0;
         }
@@ -153,7 +231,7 @@ macro_rules! strto_impl {
         let mut idx = 0;
 
         // skip any whitespace at the beginning of the string
-        while ctype::isspace(unsafe { *$s.offset(idx) } as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe { *$s.offset(idx) })) != 0 {
             idx += 1;
         }
 
@@ -219,6 +297,14 @@ macro_rules! strto_impl {
 
         num
     }};
+    // this variant is used by wchar (also wcstoimax and wcstoumax from inttypes)
+    ($type:ident, $ptr:expr, $base:expr) => {{
+        let negative = unsafe { *$ptr } == '-' as wchar_t;
+        if negative {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        strtou_impl!($type, $ptr, $base, negative)
+    }};
 }
 
 #[macro_export]
@@ -227,7 +313,7 @@ macro_rules! strto_float_impl {
         let mut s = $s;
         let endptr = $endptr;
 
-        while ctype::isspace(unsafe{*s} as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe{*s})) != 0 {
             s = unsafe{ s.offset(1)};
         }
 
@@ -335,7 +421,7 @@ macro_rules! strto_float_impl {
             // const input but mut output, yet the man page says
             // "stores the address of the first invalid character in *endptr"
             // so obviously it doesn't want us to clone it.
-            unsafe{*endptr = s as *mut _};
+            unsafe{*endptr = s.cast_mut()};
         }
 
         if let Some(exponent) = exponent {

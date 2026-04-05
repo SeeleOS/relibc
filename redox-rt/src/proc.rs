@@ -4,10 +4,10 @@ use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
     arch::*,
     auxv_defs::*,
-    protocol::{ProcCall, ThreadCall},
     read_proc_meta,
-    sys::{open, proc_call, thread_call},
+    sys::{fstat, open, proc_call, thread_call},
 };
+use redox_protocols::protocol::{ProcCall, ThreadCall};
 
 use alloc::{boxed::Box, vec};
 
@@ -61,6 +61,8 @@ pub struct ExtraInfo<'a> {
     pub proc_fd: usize,
     /// Namespace handle
     pub ns_fd: Option<usize>,
+    /// CWD handle
+    pub cwd_fd: Option<usize>,
 }
 
 pub fn fexec_impl(
@@ -258,7 +260,7 @@ pub fn fexec_impl(
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
 
-    let mut push = |word: usize| {
+    let mut push = |word: usize| -> Result<()> {
         let old_page_no = sp / PAGE_SIZE;
         sp -= size_of::<usize>();
         let new_page_no = sp / PAGE_SIZE;
@@ -342,7 +344,7 @@ pub fn fexec_impl(
     let mut argc = 0;
 
     {
-        let mut append = |source_slice: &[u8]| {
+        let mut append = |source_slice: &[u8]| -> Result<usize> {
             // TODO
             let address = target_args_env_address + offset;
 
@@ -393,6 +395,8 @@ pub fn fexec_impl(
         push(AT_REDOX_PROC_FD)?;
         push(extrainfo.ns_fd.unwrap_or(usize::MAX))?;
         push(AT_REDOX_NS_FD)?;
+        push(extrainfo.cwd_fd.unwrap_or(usize::MAX))?;
+        push(AT_REDOX_CWD_FD)?;
 
         push(0)?;
 
@@ -713,7 +717,7 @@ impl FileBufReader {
 }
 
 impl FileBufReader {
-    fn read_le_u64(&mut self) -> syscall::Result<Option<u64>> {
+    fn read_le_u64(&mut self) -> Result<Option<u64>> {
         if self.pos >= self.cap {
             debug_assert!(self.pos == self.cap);
             self.cap = crate::sys::posix_read(self.fd, &mut self.buf)?;
@@ -774,6 +778,15 @@ impl FdGuard<false> {
 }
 impl<const UPPER: bool> FdGuard<UPPER> {
     #[inline]
+    pub fn openat<T: AsRef<str>>(
+        &self,
+        path: T,
+        flags: usize,
+        fcntl_flags: usize,
+    ) -> Result<FdGuard<false>> {
+        syscall::openat(self.fd, path, flags, fcntl_flags).map(FdGuard::new)
+    }
+    #[inline]
     pub fn dup(&self, buf: &[u8]) -> Result<FdGuard<false>> {
         syscall::dup(self.fd, buf).map(FdGuard::new)
     }
@@ -785,7 +798,7 @@ impl<const UPPER: bool> FdGuard<UPPER> {
 
     #[inline]
     pub fn fstat(&self, stat: &mut syscall::Stat) -> Result<usize> {
-        syscall::fstat(self.fd, stat)
+        fstat(self.fd, stat)
     }
 
     #[inline]

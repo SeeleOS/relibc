@@ -1,6 +1,6 @@
-//! `getopt` implementation.
+//! `getopt.h` implementation.
 //!
-//! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 
 use crate::{
     header::{
@@ -13,10 +13,14 @@ use core::ptr;
 
 static mut CURRENT_OPT: *mut c_char = ptr::null_mut();
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const no_argument: c_int = 0;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const required_argument: c_int = 1;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const optional_argument: c_int = 2;
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 #[repr(C)]
 pub struct option {
     name: *const c_char,
@@ -25,9 +29,7 @@ pub struct option {
     val: c_int,
 }
 
-/// See <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
-///
-/// Non-POSIX.
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 ///
 /// Functions the same as `getopt` but also accepts long options.
 #[unsafe(no_mangle)]
@@ -112,15 +114,15 @@ pub unsafe extern "C" fn getopt_long(
                                     } else if *optstring == b':' as c_char {
                                         return c_int::from(b':');
                                     } else {
-                                        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
+                                        stdio::fputs((*argv).cast_const(), &raw mut *stdio::stderr);
                                         stdio::fputs(
                                             c": option '--".as_ptr().cast(),
-                                            &mut *stdio::stderr,
+                                            &raw mut *stdio::stderr,
                                         );
-                                        stdio::fputs(current_arg, &mut *stdio::stderr);
+                                        stdio::fputs(current_arg, &raw mut *stdio::stderr);
                                         stdio::fputs(
                                             c"' requires an argument\n".as_ptr().cast(),
-                                            &mut *stdio::stderr,
+                                            &raw mut *stdio::stderr,
                                         );
                                         return c_int::from(b'?');
                                     }
@@ -160,10 +162,10 @@ unsafe fn parse_arg(
 
     let print_error = |desc: &[u8]| unsafe {
         // NOTE: we don't use fprintf to get around the usage of va_list
-        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
-        stdio::fputs(desc.as_ptr().cast(), &mut *stdio::stderr);
-        stdio::fputc((*current_arg).into(), &mut *stdio::stderr);
-        stdio::fputc(b'\n'.into(), &mut *stdio::stderr);
+        stdio::fputs((*argv).cast_const(), &raw mut *stdio::stderr);
+        stdio::fputs(desc.as_ptr().cast(), &raw mut *stdio::stderr);
+        stdio::fputc((*current_arg).into(), &raw mut *stdio::stderr);
+        stdio::fputc(b'\n'.into(), &raw mut *stdio::stderr);
     };
 
     match unsafe { find_option(*current_arg, optstring) } {

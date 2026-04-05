@@ -1,9 +1,7 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::{
-    proc::FdGuard,
-    protocol::{FsCall, SocketCall},
-};
+use redox_protocols::protocol::{FsCall, SocketCall};
+use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
 use super::{
@@ -15,18 +13,19 @@ use crate::{
     error::{Errno, Result},
     header::{
         arpa_inet::inet_aton,
+        bits_iovec::iovec,
+        bits_socklen_t::socklen_t,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTCONN, ENOTSOCK,
-            EOPNOTSUPP, EPROTONOSUPPORT,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
+            EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
-            constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred,
+            constants::*, msghdr, sa_family_t, sockaddr, ucred,
         },
-        sys_uio::iovec,
         sys_un::sockaddr_un,
     },
 };
@@ -316,7 +315,7 @@ unsafe fn deserialize_name_from_stream(
             return Err(Errno(EMSGSIZE));
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
-            let name_buffer = &msg_stream[*cursor..*cursor + name_len];
+            let name_buffer = &msg_stream[*cursor..*cursor + name_len_in_stream];
             (unsafe {
                 inner_get_name_inner(
                     false,
@@ -326,7 +325,7 @@ unsafe fn deserialize_name_from_stream(
                 )
             })?;
         }
-        *cursor += name_len;
+        *cursor += name_len_in_stream;
     } else {
         // If name_len is 0, set msg_namelen to 0
         mhdr.msg_namelen = 0;
@@ -431,10 +430,9 @@ unsafe fn deserialize_ancillary_data_from_stream(
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
-        let mut actual_posix_cmsg_data_len: usize = 0;
         let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
 
-        match (cmsg_level, cmsg_type) {
+        let actual_posix_cmsg_data_len = match (cmsg_level, cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
                 if cmsg_data_len_in_stream != mem::size_of::<usize>() {
                     return Err(Errno(EINVAL));
@@ -460,7 +458,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 for fd in fds_usize {
                     temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
                 }
-                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+                temp_posix_cmsg_data_buf.len()
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 if cmsg_data_len_in_stream
@@ -482,12 +480,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
                         mem::size_of::<ucred>(),
                     )
                 });
-                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+                temp_posix_cmsg_data_buf.len()
             }
             _ => {
                 return Err(Errno(EINVAL));
             }
-        }
+        };
 
         let space_needed_for_posix_cmsg =
             unsafe { CMSG_SPACE(actual_posix_cmsg_data_len as u32) } as usize;
@@ -789,7 +787,11 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<usize> {
-        if flags != 0 {
+        if address.is_null() && flags == 0 {
+            Self::read(socket, unsafe {
+                slice::from_raw_parts_mut(buf as *mut u8, len)
+            })
+        } else {
             // Convert to recvmsg
             let mut iov = iovec {
                 iov_base: buf,
@@ -814,25 +816,6 @@ impl PalSocket for Sys {
             }
             return Ok(count);
         }
-        if address.is_null() || address_len.is_null() {
-            Self::read(socket, unsafe {
-                slice::from_raw_parts_mut(buf as *mut u8, len)
-            })
-        } else {
-            // TODO: in UDS dgram getpeername on listener always return ENOTCONN,
-            // it probably the expected error on usual getpeername call, but not here.
-            if let Err(e) = unsafe { Self::getpeername(socket, address, address_len) } {
-                if e.0 != ENOTCONN {
-                    return Err(e);
-                }
-                let data = unsafe { &mut *(address as *mut sockaddr) };
-                data.sa_family = AF_UNSPEC as u16;
-                unsafe { *address_len = 0 };
-            }
-            Self::read(socket, unsafe {
-                slice::from_raw_parts_mut(buf as *mut u8, len)
-            })
-        }
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
@@ -854,11 +837,12 @@ impl PalSocket for Sys {
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
         let expected_stream_size = {
-            mem::size_of::<usize>()         // name_len
-            + mhdr.msg_namelen as usize     // name_buffer
-            + mem::size_of::<usize>()       // payload_len
-            + whole_iov_size                // payload_data_buffer
-            + mem::size_of::<usize>()       // control_len
+            64                             //reserve extra space for the scheme path
+            + mem::size_of::<usize>()      // name_len
+            + mhdr.msg_namelen as usize    // name_buffer
+            + mem::size_of::<usize>()      // payload_len
+            + whole_iov_size               // payload_data_buffer
+            + mem::size_of::<usize>()      // control_len
             + mhdr.msg_controllen as usize // ancillary_stream_buffer
         };
         msg_stream
