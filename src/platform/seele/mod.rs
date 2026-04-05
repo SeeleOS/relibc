@@ -39,9 +39,9 @@ use crate::{
         stdio::SEEK_END,
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
-            FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO,
-            FBIOPUTCMAP, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_cmap,
-            fb_fix_screeninfo, fb_var_screeninfo, winsize,
+            FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, FBIOPUTCMAP,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_cmap, fb_fix_screeninfo,
+            fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
@@ -1268,8 +1268,7 @@ impl Pal for Sys {
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
-        let _ = (which, who, prio);
-        Sys::stub("SETPRIORITY").map(|_| ())
+        Ok(())
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
