@@ -853,6 +853,7 @@ impl Pal for Sys {
             SEEK_SET => SeekType::Start,
             SEEK_CUR => SeekType::Current,
             SEEK_END => SeekType::End,
+            _ => return Err(Errno(EINVAL)),
         };
 
         e_raw(process_result(seek_object(
