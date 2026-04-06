@@ -147,7 +147,6 @@ install-tests: tests
 
 install: mount install-headers install-libs
 	sync
-	-sudo umount ../sysroot
 
 submodules:
 	git submodule sync
