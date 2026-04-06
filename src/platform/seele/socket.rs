@@ -1,6 +1,8 @@
 use alloc::{ffi::CString, format};
-use core::slice;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::{
+    slice,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use seele_sys::{
     abi::object::{ControlCommand, ObjectFlags},
@@ -9,7 +11,7 @@ use seele_sys::{
         object::control_object,
         socket::{
             accept as socket_accept, bind as socket_bind, connect as socket_connect,
-            listen as socket_listen, socket as create_socket,
+            getsockopt as socket_getsockopt, listen as socket_listen, socket as create_socket,
         },
     },
     utils::process_result,
@@ -147,8 +149,14 @@ impl PalSocket for Sys {
         option_value: *mut c_void,
         option_len: *mut socklen_t,
     ) -> Result<()> {
-        let _ = (socket, level, option_name, option_value, option_len);
-        Sys::stub("GETSOCKOPT").map(|_| ())
+        e_raw(process_result(socket_getsockopt(
+            socket as u64,
+            level as u64,
+            option_name as u64,
+            option_value.cast::<u8>(),
+            option_len,
+        )))?;
+        Ok(())
     }
 
     fn listen(socket: c_int, backlog: c_int) -> Result<()> {
