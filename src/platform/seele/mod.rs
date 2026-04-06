@@ -58,7 +58,7 @@ use crate::{
         sys_wait::WNOHANG,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
-        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpgid, getpid},
+        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getgid, getpgid, getpid, getuid},
     },
     ld_so::tcb::OsSpecific,
     out::Out,
@@ -828,16 +828,42 @@ impl Pal for Sys {
         egid: Option<Out<gid_t>>,
         sgid: Option<Out<gid_t>>,
     ) -> Result<()> {
-        let _ = (rgid, egid, sgid);
-        Sys::stub("GETRESGID").map(|_| ())
+        let gid = getgid();
+
+        if let Some(ref rgid) = rgid {
+            rgid.write(gid);
+        }
+
+        if let Some(ref egid) = egid {
+            egid.write(gid);
+        }
+
+        if let Some(ref sgid) = sgid {
+            sgid.write(gid);
+        }
+
+        Ok(())
     }
     fn getresuid(
         ruid: Option<Out<uid_t>>,
         euid: Option<Out<uid_t>>,
         suid: Option<Out<uid_t>>,
     ) -> Result<()> {
-        let _ = (ruid, euid, suid);
-        Sys::stub("GETRESUID").map(|_| ())
+        let uid = getuid();
+
+        if let Some(ref ruid) = ruid {
+            ruid.write(uid);
+        }
+
+        if let Some(ref euid) = euid {
+            euid.write(uid);
+        }
+
+        if let Some(ref suid) = suid {
+            suid.write(uid);
+        }
+
+        Ok(())
     }
 
     unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> Result<()> {
