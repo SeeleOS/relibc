@@ -10,7 +10,7 @@ use seele_sys::{
         self, allocate_mem, deallocate_mem, execve,
         filesystem::{
             change_dir, create_directory, delete_file, directory_contents, file_info,
-            get_current_directory, link_file, open_file,
+            get_current_directory, link_file, open_file, read_link,
         },
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
         misc::{get_current_time, sleep, time_since_boot},
@@ -53,6 +53,7 @@ use crate::{
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
+        sys_wait::WNOHANG,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpid},
@@ -1220,13 +1221,27 @@ impl Pal for Sys {
     }
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        let _ = (pathname, out);
-        Sys::stub("READLINKAT")
+        e_raw(process_result(read_link(
+            pathname.as_ptr(),
+            false,
+            out.as_ptr(),
+            out.len() as u64,
+        )))
     }
 
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize> {
-        let _ = (dirfd, pathname, out);
-        Sys::stub("READLINKAT")
+        let from_current_dir = dirfd == AT_FDCWD;
+
+        if !from_current_dir && dirfd > 0 {
+            return Err(Errno(ENOSYS));
+        }
+
+        e_raw(process_result(read_link(
+            pathname.as_ptr(),
+            from_current_dir,
+            out.as_ptr(),
+            out.len() as u64,
+        )))
     }
 
     fn rename(old: CStr, new: CStr) -> Result<()> {
