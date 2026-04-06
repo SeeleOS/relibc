@@ -89,6 +89,7 @@ pub mod sys_auxv;
 pub mod sys_epoll;
 pub mod sys_file;
 pub mod sys_ioctl;
+pub mod sys_kd;
 // TODO: sys/ipc.h
 pub mod sys_mman;
 // TODO: sys/msg.h
@@ -104,6 +105,7 @@ pub mod sys_time;
 #[deprecated]
 pub mod sys_timeb;
 //pub mod sys_times;
+pub mod sys_vt;
 pub mod arch_aarch64_user;
 pub mod arch_riscv64_user;
 pub mod arch_x64_user;
