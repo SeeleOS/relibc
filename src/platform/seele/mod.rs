@@ -227,6 +227,7 @@ impl Sys {
         for (dst, src) in out.id.iter_mut().zip(id.iter().copied()) {
             *dst = src as c_char;
         }
+        out.smem_start = info.phys_addr as c_ulong;
         out.smem_len = info.byte_len as c_uint;
         out.type_ = FB_TYPE_PACKED_PIXELS as c_uint;
         out.visual = FB_VISUAL_TRUECOLOR as c_uint;
