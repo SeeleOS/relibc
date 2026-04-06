@@ -43,6 +43,7 @@ pub mod langinfo;
 pub mod libgen;
 pub mod limits;
 pub mod linux_fb;
+pub mod linux_keyboard;
 pub mod locale;
 pub mod malloc;
 // pub mod math; // TODO unfinished, uncomment when ready to export

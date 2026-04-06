@@ -1,5 +1,9 @@
 use crate::{
     error::ResultExt,
+    header::{
+        sys_kd::{KDGKBENT, KDGKBMODE, KDMKTONE, KDSKBMODE, KDSETMODE, KIOCSOUND},
+        sys_vt::{VT_ACTIVATE, VT_RELDISP, VT_WAITACTIVE},
+    },
     platform::{
         Sys,
         types::{c_int, c_ulong, c_void},
@@ -7,8 +11,25 @@ use crate::{
 };
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-    // TODO: Somehow support varargs to syscall??
+pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, mut args: ...) -> c_int {
+    let out = match request {
+        // These Linux ioctls take an integer payload, not a pointer.
+        x if x == VT_RELDISP as c_ulong
+            || x == VT_ACTIVATE as c_ulong
+            || x == VT_WAITACTIVE as c_ulong
+            || x == KDSETMODE as c_ulong
+            || x == KDSKBMODE as c_ulong
+            || x == KDMKTONE as c_ulong
+            || x == KIOCSOUND as c_ulong
+            || x == FBIOBLANK =>
+        {
+            unsafe { args.arg::<c_int>() as usize as *mut c_void }
+        }
+        // Keyboard entry ioctls always pass a typed pointer.
+        x if x == KDGKBMODE as c_ulong || x == KDGKBENT as c_ulong => unsafe { args.arg() },
+        _ => unsafe { args.arg() },
+    };
+
     unsafe { Sys::ioctl(fd, request, out).or_minus_one_errno() }
 }
 

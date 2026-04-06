@@ -1028,7 +1028,7 @@ pub extern "C" fn sync() {
 #[unsafe(no_mangle)]
 pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
     let mut pgrp = 0;
-    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGPGRP, (&raw mut pgrp).cast()) } < 0 {
+    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGPGRP, (&raw mut pgrp).cast::<c_void>()) } < 0 {
         return -1;
     }
     pgrp
@@ -1037,7 +1037,10 @@ pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetpgrp.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
-    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSPGRP, &raw const pgrp as _) } < 0 {
+    if unsafe {
+        sys_ioctl::ioctl(fd, sys_ioctl::TIOCSPGRP, (&raw const pgrp).cast::<c_void>() as *mut c_void)
+    } < 0
+    {
         return -1;
     }
     pgrp

@@ -296,7 +296,7 @@ pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcdrain.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::dangling_mut()) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::dangling_mut::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsendbreak.html>.
@@ -304,19 +304,19 @@ pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
 pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::null_mut()) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::null_mut::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetwinsize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcgetwinsize(fd: c_int, sws: *mut winsize) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGWINSZ, sws.cast()) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGWINSZ, sws.cast::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetwinsize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsetwinsize(fd: c_int, sws: *const winsize) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, sws.cast_mut().cast()) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, sws.cast_mut().cast::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcflow.html>.
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn tcsetwinsize(fd: c_int, sws: *const winsize) -> c_int {
 pub unsafe extern "C" fn tcflow(fd: c_int, action: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCXONC, action as *mut _) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCXONC, action as usize as *mut c_void) }
 }
 
 /// Non-POSIX, BSD extension
