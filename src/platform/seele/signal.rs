@@ -133,6 +133,10 @@ impl PalSignal for Sys {
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
+        if pgrp <= 0 {
+            return Err(Errno(EINVAL));
+        }
+
         e_raw(process_result(send_signal_group(
             pgrp as u64,
             Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?,
