@@ -13,7 +13,9 @@ use seele_sys::{
             get_current_directory, link_file, open_file, read_link,
         },
         futex, get_process_id, get_process_parent_id, get_system_info, get_thread_id,
-        misc::{get_current_time, sleep, time_since_boot},
+        misc::{
+            get_current_time, get_process_group_id, set_process_group_id, sleep, time_since_boot,
+        },
         object::{
             clone_object, clone_object_to, configurate_object, control_object,
             get_framebuffer_info, get_terminal_info, mmap_object, open_device, read_object,
@@ -56,7 +58,7 @@ use crate::{
         sys_wait::WNOHANG,
         termios::{ECHO, ECHOE, ECHOK, ECHONL, ICANON, termios},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, itimerspec},
-        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpid},
+        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK, getpgid, getpid},
     },
     ld_so::tcb::OsSpecific,
     out::Out,
@@ -776,9 +778,12 @@ impl Pal for Sys {
         4096
     }
 
-    fn getpgid(pid: pid_t) -> Result<pid_t> {
-        // TODO
-        Ok(getpid())
+    fn getpgid(mut pid: pid_t) -> Result<pid_t> {
+        if pid == 0 {
+            pid = getpid();
+        }
+
+        e_raw(process_result(get_process_group_id(pid as u64))).map(|f| f as pid_t)
     }
 
     fn getpid() -> pid_t {
@@ -1278,9 +1283,20 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
-        let _ = (pid, pgid);
-        Sys::stub("SETPGID").map(|_| ())
+    fn setpgid(mut pid: pid_t, mut pgid: pid_t) -> Result<()> {
+        if pid == 0 {
+            pid = getpid();
+        }
+
+        if pgid == 0 {
+            pgid = pid;
+        }
+
+        e_raw(process_result(set_process_group_id(
+            pid as u64,
+            pgid as u64,
+        )))
+        .map(|_| ())
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
