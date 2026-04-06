@@ -4,8 +4,8 @@ use seele_sys::{
     syscalls::{
         get_process_id,
         signal::{
-            block_signals, register_signal_action, send_signal, set_blocked_signals,
-            sig_handler_return, unblock_signals,
+            block_signals, register_signal_action, send_signal, send_signal_group,
+            set_blocked_signals, sig_handler_return, unblock_signals,
         },
     },
     utils::process_result,
@@ -133,8 +133,11 @@ impl PalSignal for Sys {
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
-        let _ = (pgrp, sig);
-        Sys::stub("KILL").map(|_| ())
+        e_raw(process_result(send_signal_group(
+            pgrp as u64,
+            Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?,
+        )))
+        .map(|_| ())
     }
 
     fn raise(sig: c_int) -> Result<()> {
