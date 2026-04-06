@@ -1350,6 +1350,7 @@ impl Pal for Sys {
         let status_ptr = stat_loc.map_or(core::ptr::null_mut(), |mut o| o.as_mut_ptr());
         loop {
             match e_raw(process_result(wait_for_process_exit(pid, status_ptr))) {
+                Err(Errno(EAGAIN)) if (options & WNOHANG) != 0 => return Ok(0),
                 Err(Errno(EAGAIN)) => continue,
                 other => return other.map(|p| p as pid_t),
             }
