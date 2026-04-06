@@ -830,15 +830,15 @@ impl Pal for Sys {
     ) -> Result<()> {
         let gid = getgid();
 
-        if let Some(ref rgid) = rgid {
+        if let Some(mut rgid) = rgid {
             rgid.write(gid);
         }
 
-        if let Some(ref egid) = egid {
+        if let Some(mut egid) = egid {
             egid.write(gid);
         }
 
-        if let Some(ref sgid) = sgid {
+        if let Some(mut sgid) = sgid {
             sgid.write(gid);
         }
 
@@ -851,15 +851,15 @@ impl Pal for Sys {
     ) -> Result<()> {
         let uid = getuid();
 
-        if let Some(ref ruid) = ruid {
+        if let Some(mut ruid) = ruid {
             ruid.write(uid);
         }
 
-        if let Some(ref euid) = euid {
+        if let Some(mut euid) = euid {
             euid.write(uid);
         }
 
-        if let Some(ref suid) = suid {
+        if let Some(mut suid) = suid {
             suid.write(uid);
         }
 
