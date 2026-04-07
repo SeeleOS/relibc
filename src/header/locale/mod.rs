@@ -16,7 +16,6 @@ use crate::{
 
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
-static mut C_UTF8_LOCALE: [c_char; 8] = [b'C' as c_char, b'.' as c_char, b'U' as c_char, b'T' as c_char, b'F' as c_char, b'-' as c_char, b'8' as c_char, 0];
 
 mod constants;
 use constants::*;
@@ -116,6 +115,9 @@ pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/newlocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: locale_t) -> locale_t {
+    if locale.is_null() {
+        return ptr::null_mut();
+    }
     let name = unsafe { CStr::from_ptr(locale) }
         .to_string_lossy()
         .into_owned();
@@ -126,20 +128,25 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
     } else {
         load_locale_file(name)
     };
-    if base != LC_GLOBAL_LOCALE {
-        // borrowing here
-        let base = base.cast_const().cast::<LocaleData>();
-        if let Ok(new_locale) = new_locale.as_mut()
-            && let Some(base) = unsafe { base.as_ref() }
-        {
-            // copy old values if not containing the mask
-            if (mask & LC_NUMERIC_MASK) == 0 {
-                new_locale.copy_category(base, LC_NUMERIC);
+    let base_locale = if base == LC_GLOBAL_LOCALE {
+        unsafe { GLOBAL_LOCALE.as_ref() }.map(|global| &global.data)
+    } else {
+        unsafe { base.cast_const().cast::<LocaleData>().as_ref() }
+    };
+    if let Ok(new_locale) = new_locale.as_mut()
+        && let Some(base) = base_locale
+    {
+        for (category, category_mask) in [
+            (LC_COLLATE, LC_COLLATE_MASK),
+            (LC_CTYPE, LC_CTYPE_MASK),
+            (LC_MESSAGES, LC_MESSAGES_MASK),
+            (LC_MONETARY, LC_MONETARY_MASK),
+            (LC_NUMERIC, LC_NUMERIC_MASK),
+            (LC_TIME, LC_TIME_MASK),
+        ] {
+            if (mask & category_mask) == 0 {
+                new_locale.copy_category(base, category);
             }
-            if (mask & LC_MONETARY_MASK) == 0 {
-                new_locale.copy_category(base, LC_MONETARY);
-            }
-            // TODO: other categories?
         }
     }
     if let Ok(new_locale) = new_locale.as_mut() {

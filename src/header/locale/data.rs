@@ -1,6 +1,6 @@
 use core::str::FromStr;
 
-use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
+use alloc::{boxed::Box, ffi::CString, format, string::String, vec::Vec};
 
 use super::constants::*;
 use crate::platform::types::{c_char, c_int};
@@ -155,6 +155,9 @@ impl LocaleData {
 
     pub fn copy_category(&mut self, other: &Self, category: c_int) {
         match category {
+            LC_COLLATE | LC_CTYPE | LC_MESSAGES | LC_TIME => {
+                self.names[category as usize] = other.names[category as usize].clone();
+            }
             LC_NUMERIC => {
                 self.decimal_point = other.decimal_point.clone();
                 self.thousands_sep = other.thousands_sep.clone();
@@ -228,7 +231,16 @@ impl LocaleData {
         self.name = if all_same {
             first
         } else {
-            CString::new("LC_COLLATE=C;LC_CTYPE=C;LC_MESSAGES=C;LC_MONETARY=C;LC_NUMERIC=C;LC_TIME=C").unwrap()
+            CString::new(format!(
+                "LC_COLLATE={};LC_CTYPE={};LC_MESSAGES={};LC_MONETARY={};LC_NUMERIC={};LC_TIME={}",
+                self.names[LC_COLLATE as usize].to_string_lossy(),
+                self.names[LC_CTYPE as usize].to_string_lossy(),
+                self.names[LC_MESSAGES as usize].to_string_lossy(),
+                self.names[LC_MONETARY as usize].to_string_lossy(),
+                self.names[LC_NUMERIC as usize].to_string_lossy(),
+                self.names[LC_TIME as usize].to_string_lossy(),
+            ))
+            .unwrap()
         };
         self.names[LC_ALL as usize] = self.name.clone();
     }
@@ -298,12 +310,28 @@ impl GlobalLocaleData {
         self.names.get(category as usize)
     }
     pub fn set_name(&mut self, category: i32, name: CString) -> Option<&CString> {
+        if category == LC_ALL {
+            for slot in &mut self.names {
+                *slot = name.clone();
+            }
+            self.data.name = name.clone();
+            self.data.names = self.names.clone();
+            return self.names.get(LC_ALL as usize);
+        }
+
         if self.names.get(category as usize).is_some() {
             self.names[category as usize] = name;
+            self.sync_names();
             self.names.get(category as usize)
         } else {
             None
         }
+    }
+
+    fn sync_names(&mut self) {
+        self.data.names = self.names.clone();
+        self.data.sync_aggregate_name();
+        self.names = self.data.names.clone();
     }
 }
 unsafe impl Sync for GlobalLocaleData {}
