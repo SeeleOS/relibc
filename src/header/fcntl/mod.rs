@@ -92,6 +92,24 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
     Sys::open(path, oflag, mode).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/openat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openat(
+    dirfd: c_int,
+    path: *const c_char,
+    oflag: c_int,
+    mut __valist: ...,
+) -> c_int {
+    let mode = if oflag & O_CREAT == O_CREAT {
+        unsafe { __valist.arg::<mode_t>() }
+    } else {
+        0
+    };
+
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::openat(dirfd, path, oflag, mode).or_minus_one_errno()
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(_: flock) {}
 
