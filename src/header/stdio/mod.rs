@@ -401,6 +401,13 @@ pub unsafe extern "C" fn ferror(stream: *mut FILE) -> c_int {
     stream.flags & F_ERR
 }
 
+/// GNU extension used by gnulib-backed packages to mark a stream as failed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __fseterr(stream: *mut FILE) {
+    let mut stream = unsafe { (*stream).lock() };
+    stream.flags |= F_ERR;
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fflush.html>.
 ///
 /// Flush output to stream, or sync read position
