@@ -11,7 +11,9 @@ use seele_sys::{
         object::control_object,
         socket::{
             accept as socket_accept, bind as socket_bind, connect as socket_connect,
-            getsockopt as socket_getsockopt, listen as socket_listen, socket as create_socket,
+            getpeername as socket_getpeername, getsockname as socket_getsockname,
+            getsockopt as socket_getsockopt, listen as socket_listen, recvmsg as socket_recvmsg,
+            shutdown as socket_shutdown, socket as create_socket,
         },
     },
     utils::process_result,
@@ -129,8 +131,12 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        let _ = (socket, address, address_len);
-        Sys::stub("GETPEERNAME").map(|_| ())
+        e_raw(process_result(socket_getpeername(
+            socket as u64,
+            address.cast::<u8>(),
+            address_len,
+        )))?;
+        Ok(())
     }
 
     unsafe fn getsockname(
@@ -138,8 +144,12 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        let _ = (socket, address, address_len);
-        Sys::stub("GETSOCKNAME").map(|_| ())
+        e_raw(process_result(socket_getsockname(
+            socket as u64,
+            address.cast::<u8>(),
+            address_len,
+        )))?;
+        Ok(())
     }
 
     unsafe fn getsockopt(
@@ -184,8 +194,11 @@ impl PalSocket for Sys {
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
-        let _ = (socket, msg, flags);
-        Sys::stub("RECVMSG")
+        e_raw(process_result(socket_recvmsg(
+            socket as u64,
+            msg.cast::<u8>(),
+            flags as u64,
+        )))
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
@@ -217,8 +230,8 @@ impl PalSocket for Sys {
     }
 
     fn shutdown(socket: c_int, how: c_int) -> Result<()> {
-        let _ = (socket, how);
-        Sys::stub("SHUTDOWN").map(|_| ())
+        e_raw(process_result(socket_shutdown(socket as u64, how as u64)))?;
+        Ok(())
     }
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
