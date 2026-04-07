@@ -8,7 +8,7 @@ use seele_sys::{
     abi::object::{ControlCommand, ObjectFlags},
     syscalls::{
         filesystem::delete_file,
-        object::control_object,
+        object::{control_object, read_object, write_object},
         socket::{
             accept as socket_accept, bind as socket_bind, connect as socket_connect,
             getpeername as socket_getpeername, getsockname as socket_getsockname,
@@ -23,6 +23,7 @@ use super::{Sys, e_raw};
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_iovec::iovec,
         errno::{EAFNOSUPPORT, EINVAL},
         sys_socket::{
             constants::{AF_UNIX, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM},
@@ -189,8 +190,17 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<usize> {
-        let _ = (socket, buf, len, flags, address, address_len);
-        Sys::stub("RECVFROM")
+        let _ = flags;
+
+        if !address_len.is_null() {
+            unsafe {
+                *address_len = 0;
+            }
+        }
+        let _ = address;
+
+        let buffer = unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), len) };
+        e_raw(process_result(read_object(socket as u64, buffer)))
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
@@ -202,8 +212,45 @@ impl PalSocket for Sys {
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
-        let _ = (socket, msg, flags);
-        Sys::stub("SENDMSG")
+        let _ = flags;
+
+        if msg.is_null() {
+            return Err(Errno(EINVAL));
+        }
+
+        let msg = unsafe { &*msg };
+        if !msg.msg_name.is_null() || msg.msg_namelen != 0 || !msg.msg_control.is_null() || msg.msg_controllen != 0 {
+            return Err(Errno(EINVAL));
+        }
+
+        if msg.msg_iovlen == 0 {
+            return Ok(0);
+        }
+        if msg.msg_iov.is_null() {
+            return Err(Errno(EINVAL));
+        }
+
+        let iovs = unsafe { slice::from_raw_parts(msg.msg_iov.cast::<iovec>(), msg.msg_iovlen) };
+        let mut total_written = 0usize;
+
+        for iov in iovs {
+            if iov.iov_len == 0 {
+                continue;
+            }
+            if iov.iov_base.is_null() {
+                return Err(Errno(EINVAL));
+            }
+
+            let buffer = unsafe { slice::from_raw_parts(iov.iov_base.cast::<u8>(), iov.iov_len) };
+            let written = e_raw(process_result(write_object(socket as u64, buffer)))?;
+            total_written += written;
+
+            if written < buffer.len() {
+                break;
+            }
+        }
+
+        Ok(total_written)
     }
 
     unsafe fn sendto(
@@ -214,8 +261,13 @@ impl PalSocket for Sys {
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
     ) -> Result<usize> {
-        let _ = (socket, buf, len, flags, dest_addr, dest_len);
-        Sys::stub("SENDTO")
+        let _ = flags;
+        if !dest_addr.is_null() || dest_len != 0 {
+            return Err(Errno(EINVAL));
+        }
+
+        let buffer = unsafe { slice::from_raw_parts(buf.cast::<u8>(), len) };
+        e_raw(process_result(write_object(socket as u64, buffer)))
     }
 
     unsafe fn setsockopt(
