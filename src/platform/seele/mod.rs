@@ -224,6 +224,18 @@ impl Sys {
         }
     }
 
+    fn framebuffer_transparency(bytes_per_pixel: usize) -> fb_bitfield {
+        if bytes_per_pixel >= 4 {
+            fb_bitfield {
+                offset: 24,
+                length: 8,
+                msb_right: 0,
+            }
+        } else {
+            fb_bitfield::default()
+        }
+    }
+
     fn fill_linux_fb_fix(info: SeeleFramebufferInfo, out: &mut fb_fix_screeninfo) {
         *out = fb_fix_screeninfo::default();
         let id = b"seelefb\0";
@@ -248,9 +260,9 @@ impl Sys {
         out.red = red;
         out.green = green;
         out.blue = blue;
-        out.transp = fb_bitfield::default();
-        out.height = info.height as c_uint;
-        out.width = info.width as c_uint;
+        out.transp = Self::framebuffer_transparency(info.bytes_per_pixel);
+        out.height = c_uint::MAX;
+        out.width = c_uint::MAX;
     }
 
     fn fill_linux_fb_cmap(out: &mut fb_cmap) {
