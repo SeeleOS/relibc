@@ -74,6 +74,7 @@ pub(crate) const fn posix_lconv() -> lconv {
 #[repr(C)]
 pub(crate) struct LocaleData {
     pub name: CString,
+    pub names: [CString; 7],
     pub lconv: lconv,
     // Owned memory buffers
     pub decimal_point: CString,
@@ -91,8 +92,18 @@ unsafe impl Sync for LocaleData {}
 
 impl LocaleData {
     pub fn new(name: CString, defs: PosixLocaleDef) -> Box<Self> {
+        let names = [
+            name.clone(),
+            name.clone(),
+            name.clone(),
+            name.clone(),
+            name.clone(),
+            name.clone(),
+            name.clone(),
+        ];
         let mut data = Box::new(LocaleData {
             name,
+            names,
             decimal_point: Self::to_cstring(defs.decimal_point),
             thousands_sep: Self::to_cstring(defs.thousands_sep),
             grouping: Self::to_grouping_char(defs.grouping),
@@ -149,6 +160,7 @@ impl LocaleData {
                 self.thousands_sep = other.thousands_sep.clone();
                 self.grouping = other.grouping.clone();
                 self.lconv.frac_digits = other.lconv.frac_digits;
+                self.names[LC_NUMERIC as usize] = other.names[LC_NUMERIC as usize].clone();
             }
             LC_MONETARY => {
                 self.int_curr_symbol = other.int_curr_symbol.clone();
@@ -171,6 +183,7 @@ impl LocaleData {
                 self.lconv.int_n_sep_by_space = other.lconv.int_n_sep_by_space;
                 self.lconv.int_p_sign_posn = other.lconv.int_p_sign_posn;
                 self.lconv.int_n_sign_posn = other.lconv.int_n_sign_posn;
+                self.names[LC_MONETARY as usize] = other.names[LC_MONETARY as usize].clone();
             }
             LC_ALL => {
                 *self = other.clone();
@@ -178,7 +191,46 @@ impl LocaleData {
             _ => {}
         }
 
+        if category != LC_ALL {
+            self.sync_aggregate_name();
+        }
+
         self.update_lconv_pointers();
+    }
+
+    pub fn set_name(&mut self, category: c_int, name: CString) -> Option<&CString> {
+        if category == LC_ALL {
+            for slot in &mut self.names {
+                *slot = name.clone();
+            }
+            self.name = name;
+            return self.names.get(LC_ALL as usize);
+        }
+
+        if self.names.get(category as usize).is_some() {
+            self.names[category as usize] = name;
+            self.sync_aggregate_name();
+            self.names.get(category as usize)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_name(&self, category: c_int) -> Option<&CString> {
+        self.names.get(category as usize)
+    }
+
+    fn sync_aggregate_name(&mut self) {
+        let first = self.names[LC_COLLATE as usize].clone();
+        let all_same = self.names[..LC_ALL as usize]
+            .iter()
+            .all(|name| name.as_c_str() == first.as_c_str());
+        self.name = if all_same {
+            first
+        } else {
+            CString::new("LC_COLLATE=C;LC_CTYPE=C;LC_MESSAGES=C;LC_MONETARY=C;LC_NUMERIC=C;LC_TIME=C").unwrap()
+        };
+        self.names[LC_ALL as usize] = self.name.clone();
     }
 
     fn to_cstring(opt: Option<CString>) -> CString {
@@ -200,6 +252,7 @@ impl Clone for LocaleData {
     fn clone(&self) -> Self {
         let mut data = Self {
             name: self.name.clone(),
+            names: self.names.clone(),
             lconv: self.lconv.clone(),
             decimal_point: self.decimal_point.clone(),
             thousands_sep: self.thousands_sep.clone(),

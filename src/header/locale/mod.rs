@@ -16,6 +16,7 @@ use crate::{
 
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
+static mut C_UTF8_LOCALE: [c_char; 8] = [b'C' as c_char, b'.' as c_char, b'U' as c_char, b'T' as c_char, b'F' as c_char, b'-' as c_char, b'8' as c_char, 0];
 
 mod constants;
 use constants::*;
@@ -80,6 +81,7 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
     match locale_file {
         Ok(loc_ptr) => {
             global.data.copy_category(&loc_ptr, category);
+            let _ = global.data.set_name(category, CString::from_str(name).unwrap());
             let Some(name) = global.set_name(category, CString::from_str(name).unwrap()) else {
                 return ptr::null_mut();
             };
@@ -140,6 +142,20 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
             // TODO: other categories?
         }
     }
+    if let Ok(new_locale) = new_locale.as_mut() {
+        for (category, category_mask) in [
+            (LC_COLLATE, LC_COLLATE_MASK),
+            (LC_CTYPE, LC_CTYPE_MASK),
+            (LC_MESSAGES, LC_MESSAGES_MASK),
+            (LC_MONETARY, LC_MONETARY_MASK),
+            (LC_NUMERIC, LC_NUMERIC_MASK),
+            (LC_TIME, LC_TIME_MASK),
+        ] {
+            if (mask & category_mask) != 0 {
+                let _ = new_locale.set_name(category, CString::from_str(name).unwrap());
+            }
+        }
+    }
     new_locale.or_errno_null_mut().cast()
 }
 
@@ -164,6 +180,46 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
         let loc = loc.cast_const().cast::<LocaleData>();
         Box::into_raw(unsafe { Box::from((*loc).clone()) }) as locale_t
     }
+}
+
+/// GNU extension used by gnulib/gettext to query a locale object's category name.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn getlocalename_l(category: c_int, locale: locale_t) -> *const c_char {
+    if !(LC_COLLATE..=LC_ALL).contains(&category) {
+        return ptr::null();
+    }
+
+    if locale.is_null() || locale == LC_GLOBAL_LOCALE {
+        return unsafe { setlocale(category, ptr::null()) }.cast_const();
+    }
+
+    let loc = unsafe { locale.cast::<LocaleData>().as_ref() };
+    let Some(loc) = loc else {
+        return ptr::null();
+    };
+    if let Some(name) = loc.get_name(category) {
+        return name.as_ptr();
+    }
+    ptr::null()
+}
+
+/// GNU extension used by gnulib to distinguish a UTF-8 locale from plain C.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn locale_charset() -> *const c_char {
+    let current = unsafe { uselocale(ptr::null_mut()) };
+    let name = if current == LC_GLOBAL_LOCALE || current.is_null() {
+        unsafe { setlocale(LC_CTYPE, ptr::null()) }
+    } else {
+        unsafe { getlocalename_l(LC_CTYPE, current) }.cast_mut()
+    };
+
+    if !name.is_null() {
+        let locale = unsafe { CStr::from_ptr(name) }.to_string_lossy();
+        if locale.contains("UTF-8") || locale.contains("utf8") || locale.contains("utf-8") {
+            return c"UTF-8".as_ptr();
+        }
+    }
+    c"ASCII".as_ptr()
 }
 
 pub(crate) fn load_locale_file(name: &str) -> Result<Box<LocaleData>, Errno> {
