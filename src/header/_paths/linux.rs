@@ -4,6 +4,9 @@
 pub const _PATH_DEFPATH: &str = "/usr/local/bin:/bin:/usr/bin";
 pub const _PATH_STDPATH: &str = "/bin:/usr/bin:/sbin:/usr/sbin";
 
+#[cfg(target_os = "seele")]
+pub const _PATH_BSHELL: &str = "/programs/bash";
+#[cfg(not(target_os = "seele"))]
 pub const _PATH_BSHELL: &str = "/bin/sh";
 pub const _PATH_CONSOLE: &str = "/dev/console";
 pub const _PATH_DEVNULL: &str = "/dev/null";
