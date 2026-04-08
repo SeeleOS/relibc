@@ -2,6 +2,7 @@ sys_includes = [
     "stdio.h",
     "time.h",
     "features.h",
+    "bits/locale-t.h",
 ]
 after_includes = """
 // int32_t, uint32_t, WCHAR_MIN, WCHAR_MAX
