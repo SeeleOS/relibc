@@ -1269,10 +1269,7 @@ impl Pal for Sys {
         stack: *mut usize,
         _os_specific: &mut OsSpecific,
     ) -> Result<crate::pthread::OsTid> {
-        use seele_sys::syscalls::misc::thread_clone;
-
-        let result = e_raw(process_result(thread_clone(stack as u64)))?;
-        Ok(crate::pthread::OsTid { thread_id: result })
+        unimplemented!()
     }
 
     #[cfg(target_arch = "aarch64")]
