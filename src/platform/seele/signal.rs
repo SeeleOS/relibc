@@ -5,7 +5,7 @@ use seele_sys::{
         get_process_id,
         signal::{
             block_signals, register_signal_action, send_signal, send_signal_group,
-            set_blocked_signals, sig_handler_return, unblock_signals,
+            send_signal_to_all, set_blocked_signals, sig_handler_return, unblock_signals,
         },
     },
     utils::process_result,
@@ -17,9 +17,9 @@ use crate::{
         netdb::protoent,
         signal::{
             SA_RESTORER, SA_SIGINFO, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGKILL, SIGSTOP, kill,
-            sigval,
+            killpg, sigval,
         },
-        unistd::getpid,
+        unistd::{getpgid, getpid},
     },
     platform::{Pal, sys::e_raw},
 };
@@ -105,10 +105,22 @@ impl PalSignal for Sys {
     }
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()> {
-        e_raw(process_result(send_signal(
-            pid as u64,
-            Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?,
-        )))
+        if sig == 0 {
+            return Ok(());
+        }
+
+        let signal = Signal::try_from(sig as u64).map_err(|_| Errno(EINVAL))?;
+        e_raw(process_result({
+            if pid == 0 {
+                send_signal_group(getpgid(pid) as u64, signal)
+            } else if pid == -1 {
+                send_signal_to_all(signal)
+            } else if pid < -1 {
+                send_signal_group(-pid as u64, signal)
+            } else {
+                send_signal(pid as u64, signal)
+            }
+        }))
         .map(|_| ())
     }
 
