@@ -15,6 +15,7 @@ use crate::{
     error::{Errno, ResultExt},
     fs::File,
     header::{
+        bits_locale_t::locale_t,
         ctype,
         errno::{self, *},
         fcntl::*,
@@ -718,7 +719,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     let mut wc: wchar_t = 0;
-    let mut state: mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t::default();
     let result: usize = unsafe { mbrtowc(&raw mut wc, s, n, &raw mut state) };
 
     if result == -1isize as usize {
@@ -734,14 +735,14 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbstowcs.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mbstowcs(pwcs: *mut wchar_t, mut s: *const c_char, n: size_t) -> size_t {
-    let mut state: mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t::default();
     unsafe { mbsrtowcs(pwcs, &raw mut s, n, &raw mut state) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbtowc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_int {
-    let mut state: mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t::default();
     (unsafe { mbrtowc(pwc, s, n, &raw mut state) }) as c_int
 }
 
@@ -1491,10 +1492,30 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
     strto_float_impl!(c_double, s, endptr)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod_l.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strtod_l(
+    s: *const c_char,
+    endptr: *mut *mut c_char,
+    _loc: locale_t,
+) -> c_double {
+    unsafe { strtod(s, endptr) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtod.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c_float {
     strto_float_impl!(c_float, s, endptr)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtof_l.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strtof_l(
+    s: *const c_char,
+    endptr: *mut *mut c_char,
+    _loc: locale_t,
+) -> c_float {
+    unsafe { strtof(s, endptr) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
@@ -1502,8 +1523,6 @@ pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c
 pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
     strto_impl!(c_long, true, c_long::MAX, c_long::MIN, s, endptr, base)
 }
-
-// TODO: strtold(), when long double is available
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
 #[unsafe(no_mangle)]
@@ -1681,14 +1700,14 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstombs.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstombs(s: *mut c_char, mut pwcs: *const wchar_t, n: size_t) -> size_t {
-    let mut state: mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t::default();
     unsafe { wcsrtombs(s, &raw mut pwcs, n, &raw mut state) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctomb.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
-    let mut state: mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t::default();
     let result: usize = unsafe { wcrtomb(s, wc, &raw mut state) };
 
     if result == -1isize as usize {
