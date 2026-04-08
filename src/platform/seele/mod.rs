@@ -2,7 +2,10 @@ use alloc::{slice, str};
 use seele_sys::{
     abi::{
         framebuffer::{FramebufferInfo as SeeleFramebufferInfo, FramebufferPixelFormat},
-        object::{ControlCommand, SeekType, TerminalInfo as SeeleTerminalInfo, device_from_path},
+        object::{
+            ControlCommand, ObjectFlags, SeekType, TerminalInfo as SeeleTerminalInfo,
+            device_from_path,
+        },
     },
     misc::SystemInfo,
     permission::Permissions,
@@ -34,8 +37,8 @@ use crate::{
         dirent::dirent,
         errno::{EAGAIN, EEXIST, EINVAL, EIO, ENOSYS, EOVERFLOW},
         fcntl::{
-            AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_CREAT, O_EXCL,
-            O_NONBLOCK, sys,
+            AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, F_GETFD, F_GETFL, F_SETFD, F_SETFL, FD_CLOEXEC,
+            O_CLOEXEC, O_CREAT, O_EXCL, O_NONBLOCK, sys,
         },
         signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SIGCHLD, sigevent, sigset_t},
         stdio::SEEK_END,
@@ -702,8 +705,44 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
-        let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
-        e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
+        match cmd {
+            F_GETFL => {
+                let raw_flags = e_raw(process_result(control_object(
+                    fildes as u64,
+                    ControlCommand::GetFlags,
+                    0,
+                )))?;
+                let flags = ObjectFlags::from_bits(raw_flags as u64).ok_or(Errno(EIO))?;
+
+                let mut linux_flags = 0;
+                if flags.contains(ObjectFlags::NONBLOCK) {
+                    linux_flags |= O_NONBLOCK;
+                }
+
+                Ok(linux_flags)
+            }
+            F_SETFL => {
+                let mut object_flags = ObjectFlags::empty();
+                if (arg & O_NONBLOCK as c_ulonglong) != 0 {
+                    object_flags |= ObjectFlags::NONBLOCK;
+                }
+
+                e_raw(process_result(control_object(
+                    fildes as u64,
+                    ControlCommand::SetFlags,
+                    object_flags.bits(),
+                )))
+                .map(|f| f as c_int)
+            }
+            F_GETFD | F_SETFD => {
+                let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
+                e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
+            }
+            _ => {
+                let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
+                e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
+            }
+        }
     }
 
     unsafe fn fork() -> Result<pid_t> {
