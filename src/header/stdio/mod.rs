@@ -1018,6 +1018,9 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             command.cast::<c_char>()
         };
 
+        #[cfg(target_os = "seele")]
+        let shell = c"/programs/bash".as_ptr();
+        #[cfg(not(target_os = "seele"))]
         let shell = c"/bin/sh".as_ptr();
 
         let args = [c"sh".as_ptr(), c"-c".as_ptr(), command_nonnull, ptr::null()];
