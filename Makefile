@@ -81,7 +81,6 @@ headers: $(HEADERS_DEPS)
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
 	done; \
-	printf "\nfloat wcstof(const wchar_t *ptr, wchar_t **end);\nlong double wcstold(const wchar_t *ptr, wchar_t **end);\n" >> "$(TARGET_HEADERS)/wchar.h"; \
 	echo -e "\033[0;36;49mAll headers written\033[0m";
 
 clean:
@@ -118,6 +117,7 @@ ifneq ($(filter %-seele,$(TARGET)),)
 	sudo cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib_binaries"
 	sudo mkdir -pv "$(DESTDIR)/$(dir $(LD_SO_PATH))"
 	sudo cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
+	sudo cp -v "ld_so/ld_script/x86_64-unknown-seele.ld" "$(DESTDIR)/lib_binaries"
 	sudo cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib_binaries/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	sudo $(AR) -rcs "$(DESTDIR)/lib_binaries/libdl.a"
