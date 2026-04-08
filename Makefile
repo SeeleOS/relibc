@@ -72,7 +72,10 @@ headers: $(HEADERS_DEPS)
 	for header in $(HEADERS_UNPARSED); do \
 		echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
-			out=`echo "$$header" | sed 's/_/\//g'`; \
+			case "$$header" in \
+				nl_types) out="nl_types" ;; \
+				*) out=`echo "$$header" | sed 's/_/\//g'` ;; \
+			esac; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
