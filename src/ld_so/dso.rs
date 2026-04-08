@@ -121,18 +121,26 @@ impl<'a> HashTable<'a> {
         }
     }
 
-    fn symbol_table_length(&self) -> usize {
+    fn symbol_table_length(&self) -> Option<usize> {
         match self {
             Self::Gnu(hash_table) => hash_table
                 .symbol_table_length(NativeEndian)
-                .expect("empty GNU symbol hash table")
-                as usize,
-            Self::Sysv(hash_table) => hash_table.symbol_table_length() as usize,
+                .map(|len| len as usize),
+            Self::Sysv(hash_table) => Some(hash_table.symbol_table_length() as usize),
         }
     }
 }
 
 type InitFn = unsafe extern "C" fn();
+
+fn read_u32_words(data: &[u8], offset: usize, count: usize) -> Option<Vec<u32>> {
+    let bytes = data.get(offset..offset.checked_add(count.checked_mul(4)?)?)?;
+    Some(
+        bytes.chunks_exact(4)
+            .map(|chunk| u32::from_ne_bytes(chunk.try_into().unwrap()))
+            .collect(),
+    )
+}
 
 pub(super) struct Dynamic<'data> {
     runpath: Option<String>,
@@ -683,6 +691,7 @@ impl DSO {
         let mut pltrelsz = None;
         let mut debug = None;
         let mut symtab_ptr = None;
+        let mut gnu_hash_offset = None;
         let (mut rel_ptr, mut rel_len) = (None, None);
         let (mut relr_ptr, mut relr_len) = (None, None);
         let (mut strtab_offset, mut strtab_size) = (None, None);
@@ -706,6 +715,7 @@ impl DSO {
                 // > matter if this is longer than needed...
                 elf::DT_GNU_HASH => {
                     let value = GnuHashTable::parse(NativeEndian, &mmap[relative_idx..])?;
+                    gnu_hash_offset = Some(relative_idx);
                     hash_table = Some(HashTable::Gnu(value));
                 }
 
@@ -812,6 +822,26 @@ impl DSO {
 
         let jmprel = jmprel.unwrap_or_default();
         let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
+        let symbol_count = match hash_table.symbol_table_length() {
+            Some(len) => len,
+            None => {
+                let header_words = gnu_hash_offset.map(|offset| {
+                    let mut words = [0_u32; 4];
+                    for (idx, chunk) in mmap[offset..core::cmp::min(offset + 16, mmap.len())]
+                        .chunks_exact(4)
+                        .take(4)
+                        .enumerate()
+                    {
+                        words[idx] = u32::from_ne_bytes(chunk.try_into().unwrap());
+                    }
+                    words
+                });
+                panic!(
+                    "empty GNU symbol hash table while parsing '{}': gnu_hash_offset={gnu_hash_offset:?} header_words={header_words:?}",
+                    path
+                );
+            }
+        };
 
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
@@ -821,7 +851,7 @@ impl DSO {
 
         Ok((
             Dynamic {
-                symbols: unsafe { get_array(symtab_ptr, Some(hash_table.symbol_table_length())) },
+                symbols: unsafe { get_array(symtab_ptr, Some(symbol_count)) },
                 runpath,
                 got,
                 needed,
@@ -891,7 +921,13 @@ impl DSO {
         let b = self.mmap.as_ptr() as usize;
 
         let (sym, my_sym) = if reloc.sym != STN_UNDEF {
-            let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+            let name = self.dynamic.symbol_name(reloc.sym).unwrap_or_else(|| {
+                panic!(
+                    "failed to resolve relocation symbol name in '{}' for reloc={reloc:?} symbol_count={}",
+                    self.name,
+                    self.dynamic.symbols.len()
+                )
+            });
 
             let lookup_scopes = [global_scope, self.scope()];
             let sym = if matches!(reloc.kind, RelocationKind::COPY) {
@@ -994,7 +1030,15 @@ impl DSO {
             RelocationKind::TLSDESC => {
                 self.do_tlsdesc_reloc(reloc, ptr.cast::<usize>(), global_scope)
             }
-            _ => unimplemented!("relocation type {:?}", reloc.kind),
+            _ => {
+                let sym_name = self.dynamic.symbol_name(reloc.sym);
+                unimplemented!(
+                    "relocation type {:?} in '{}' reloc={reloc:?} sym_name={sym_name:?} base={:#x}",
+                    reloc.kind,
+                    self.name,
+                    b
+                )
+            }
         }
 
         Ok(())
@@ -1022,7 +1066,7 @@ impl DSO {
             size_of::<Rel>()
         };
 
-        for addr in (jmprel..(jmprel + pltrelsz)).step_by(relsz) {
+        for (entry_index, addr) in (jmprel..(jmprel + pltrelsz)).step_by(relsz).enumerate() {
             let reloc: Relocation = if self.dynamic.explicit_addend {
                 unsafe { &*(addr as *const Rela) }.into()
             } else {
@@ -1045,7 +1089,13 @@ impl DSO {
                 }
 
                 (RelocationKind::PLT, Resolve::Now) => {
-                    let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+                    let name = self.dynamic.symbol_name(reloc.sym).unwrap_or_else(|| {
+                        panic!(
+                            "failed to resolve PLT symbol name in '{}' for reloc={reloc:?} symbol_count={}",
+                            self.name,
+                            self.dynamic.symbols.len()
+                        )
+                    });
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
@@ -1069,10 +1119,15 @@ impl DSO {
                 }
 
                 _ => {
+                    let sym_name = self.dynamic.symbol_name(reloc.sym);
                     unimplemented!(
-                        "relocation type {:?} with resolve {:?}",
+                        "relocation type {:?} with resolve {:?} in '{}' entry_index={} reloc={reloc:?} sym_name={sym_name:?} jmprel={:#x} pltrelsz={:#x}",
                         reloc.kind,
-                        resolve
+                        resolve,
+                        self.name,
+                        entry_index,
+                        jmprel,
+                        pltrelsz
                     )
                 }
             }
