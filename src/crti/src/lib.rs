@@ -31,6 +31,14 @@ global_asm!(
 #[cfg(target_arch = "x86_64")]
 global_asm!(
     r#"
+    .section .data.rel.ro,"aw"
+    .hidden __dso_handle
+    .globl __dso_handle
+    .type __dso_handle, @object
+    .size __dso_handle, 8
+    __dso_handle:
+        .quad __dso_handle
+
     .section .init
     .global _init
     _init:
