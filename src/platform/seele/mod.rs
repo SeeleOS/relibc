@@ -45,8 +45,8 @@ use crate::{
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
             FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, FBIOPUTCMAP,
-            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGWINSZ, TIOCSPGRP, fb_bitfield,
-            fb_cmap, fb_fix_screeninfo, fb_var_screeninfo, winsize,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGWINSZ, TIOCSWINSZ, TIOCSPGRP,
+            fb_bitfield, fb_cmap, fb_fix_screeninfo, fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
