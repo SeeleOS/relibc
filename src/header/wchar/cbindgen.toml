@@ -32,6 +32,17 @@ after_includes = """
 #include <stddef.h>
 
 #define WEOF (0xffffffffu)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+float wcstof(const wchar_t *ptr, wchar_t **end);
+long double wcstold(const wchar_t *ptr, wchar_t **end);
+
+#ifdef __cplusplus
+}
+#endif
 """
 include_guard = "_RELIBC_WCHAR_H"
 language = "C"

@@ -1,8 +1,16 @@
 sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h", "bits/locale-t.h"]
 include_guard = "_RELIBC_STDLIB_H"
-trailer = """
+after_includes = """
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 long double strtold(const char *nptr, char **endptr);
 long double strtold_l(const char *nptr, char **endptr, locale_t _loc);
+
+#ifdef __cplusplus
+}
+#endif
 """
 language = "C"
 style = "Type"
