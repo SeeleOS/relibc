@@ -3,8 +3,8 @@ use seele_sys::{
     abi::{
         framebuffer::{FramebufferInfo as SeeleFramebufferInfo, FramebufferPixelFormat},
         object::{
-            ControlCommand, ObjectFlags, SeekType, TerminalInfo as SeeleTerminalInfo,
-            device_from_path,
+            ConfigCommand, ControlCommand, ObjectFlags, SeekType,
+            TerminalInfo as SeeleTerminalInfo, device_from_path,
         },
     },
     misc::SystemInfo,
@@ -45,8 +45,8 @@ use crate::{
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
             FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, FBIOPUTCMAP,
-            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, fb_bitfield, fb_cmap, fb_fix_screeninfo,
-            fb_var_screeninfo, winsize,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGWINSZ, TIOCSPGRP, fb_bitfield,
+            fb_cmap, fb_fix_screeninfo, fb_var_screeninfo, winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
@@ -452,6 +452,27 @@ impl Sys {
 
                 Ok(0)
             }
+            TIOCGPGRP => unsafe {
+                let group = e_raw(process_result(configurate_object(
+                    fd as u64,
+                    ConfigCommand::TermGetActiveGroup as u64,
+                    core::ptr::null_mut(),
+                )))?;
+
+                out.cast::<pid_t>().write(group as pid_t);
+                Ok(0)
+            },
+            TIOCSPGRP => unsafe {
+                let group = out.cast::<pid_t>().read();
+
+                e_raw(process_result(configurate_object(
+                    fd as u64,
+                    ConfigCommand::TermSetActiveGroup as u64,
+                    group as *mut u8,
+                )))?;
+
+                Ok(0)
+            },
             _ => e_raw(process_result(configurate_object(
                 fd as u64,
                 request,
@@ -736,11 +757,13 @@ impl Pal for Sys {
             }
             F_GETFD | F_SETFD => {
                 let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
-                e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
+                e_raw(process_result(control_object(fildes as u64, command, arg)))
+                    .map(|f| f as c_int)
             }
             _ => {
                 let command = ControlCommand::from_linux(cmd).ok_or(Errno(EINVAL))?;
-                e_raw(process_result(control_object(fildes as u64, command, arg))).map(|f| f as c_int)
+                e_raw(process_result(control_object(fildes as u64, command, arg)))
+                    .map(|f| f as c_int)
             }
         }
     }
