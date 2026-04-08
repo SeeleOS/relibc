@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "stdint.h", "stddef.h", "features.h"]
+sys_includes = ["sys/types.h", "stdint.h", "stddef.h", "features.h", "bits/locale-t.h"]
 include_guard = "_RELIBC_TIME_H"
 language = "C"
 style = "Tag"
