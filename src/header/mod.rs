@@ -56,7 +56,7 @@ pub mod netdb;
 pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
-// TODO: nl_types.h
+pub mod nl_types;
 // TODO: Remove C header paths.h when cbindgen can export C/Rust strs
 // pub mod paths;
 pub mod poll;
