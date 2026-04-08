@@ -1,0 +1,6 @@
+sys_includes = ["stdint.h", "features.h"]
+include_guard = "_RELIBC_NL_TYPES_H"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
