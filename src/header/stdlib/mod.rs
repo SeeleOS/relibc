@@ -1590,6 +1590,9 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     if child_pid == 0 {
         let command_nonnull = command.cast::<c_char>();
 
+        #[cfg(target_os = "seele")]
+        let shell = c"/programs/bash".as_ptr();
+        #[cfg(not(target_os = "seele"))]
         let shell = c"/bin/sh".as_ptr();
 
         let args = [c"sh".as_ptr(), c"-c".as_ptr(), command_nonnull, ptr::null()];
