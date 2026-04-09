@@ -22,14 +22,8 @@ pub struct sysinfo {
     pub totalhigh: c_ulong,
     pub freehigh: c_ulong,
     pub mem_unit: c_uint,
-    #[cfg(target_pointer_width = "32")]
+    // Fixed trailing padding keeps the generated header simple and portable.
     pub _f: [c_char; 8],
-    #[cfg(target_pointer_width = "64")]
-    pub _f: [c_char; 0],
-}
-
-pub extern "C" fn _cbindgen_export_sysinfo(info: sysinfo) {
-    let _ = info;
 }
 
 /// Minimal Linux-compatible `sysinfo()` stub.
