@@ -142,6 +142,18 @@ pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
         .or_minus_one_errno()
 }
 
+/// Minimal `utimensat()` stub for targets that only need link compatibility.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn utimensat(
+    dirfd: c_int,
+    path: *const c_char,
+    times: *const timespec,
+    flags: c_int,
+) -> c_int {
+    let _ = (dirfd, path, times, flags);
+    0
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lstat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
