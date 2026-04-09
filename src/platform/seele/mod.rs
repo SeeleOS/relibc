@@ -83,6 +83,7 @@ mod epoll;
 mod ptrace;
 mod signal;
 mod socket;
+mod timer;
 mod unwind_stub;
 
 pub use unwind_stub::*;
@@ -1422,23 +1423,15 @@ impl Pal for Sys {
     }
 
     fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
-        let _ = (clock_id, evp);
-        if !timerid.as_mut_ptr().is_null() {
-            unsafe {
-                *timerid.as_mut_ptr() = core::ptr::null_mut();
-            }
-        }
-        Sys::stub("TIMER_CREATE").map(|_| ())
+        timer::timer_create(clock_id, evp, timerid)
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        let _ = timerid;
-        Sys::stub("TIMER_DELETE").map(|_| ())
+        timer::timer_delete(timerid)
     }
 
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        let _ = (timerid, value.as_mut_ptr());
-        Sys::stub("TIMER_GETTIME").map(|_| ())
+        timer::timer_gettime(timerid, value)
     }
 
     fn timer_settime(
@@ -1447,8 +1440,7 @@ impl Pal for Sys {
         value: &itimerspec,
         ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        let _ = (timerid, flags, value, ovalue);
-        Sys::stub("TIMER_SETTIME").map(|_| ())
+        timer::timer_settime(timerid, flags, value, ovalue)
     }
 
     fn umask(mask: mode_t) -> mode_t {
