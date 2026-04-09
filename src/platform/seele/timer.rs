@@ -132,14 +132,11 @@ fn timer_notify_from_sigevent(evp: &sigevent) -> Result<TimerNotifyStruct> {
     }
 }
 
-impl TryFrom<clockid_t> for TimeType {
-    type Error = Errno;
-    fn try_from(value: clockid_t) -> core::result::Result<Self, Self::Error> {
-        match value {
-            CLOCK_MONOTONIC => Ok(TimeType::SinceBoot),
-            CLOCK_REALTIME => Ok(TimeType::Realtime),
-            _ => Err(Errno(EINVAL)),
-        }
+fn time_type_from_clock_id(value: clockid_t) -> Result<TimeType> {
+    match value {
+        CLOCK_MONOTONIC => Ok(TimeType::SinceBoot),
+        CLOCK_REALTIME => Ok(TimeType::Realtime),
+        _ => Err(Errno(EINVAL)),
     }
 }
 
@@ -148,7 +145,7 @@ pub(super) fn timer_create(
     evp: &sigevent,
     mut timerid: Out<timer_t>,
 ) -> Result<()> {
-    let time_type: TimeType = clock_id.try_into()?;
+    let time_type = time_type_from_clock_id(clock_id)?;
     let notify_type = timer_notify_from_sigevent(evp)?;
 
     let timer_id = e_raw(process_result(create_timer(
