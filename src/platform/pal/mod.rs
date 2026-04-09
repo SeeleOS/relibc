@@ -279,6 +279,8 @@ pub trait Pal {
 
     fn timer_delete(timerid: timer_t) -> Result<()>;
 
+    fn timer_getoverrun(timerid: timer_t) -> Result<c_int>;
+
     fn timer_gettime(timerid: timer_t, value: Out<itimerspec>) -> Result<()>;
 
     fn timer_settime(

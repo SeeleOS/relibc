@@ -841,6 +841,10 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(TIMER_DELETE, timerid) }).map(|_| ())
     }
 
+    fn timer_getoverrun(timerid: timer_t) -> Result<c_int> {
+        e_raw(unsafe { syscall!(TIMER_GETOVERRUN, timerid) }).map(|v| v as c_int)
+    }
+
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
         e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, value.as_mut_ptr()) }).map(|_| ())
     }

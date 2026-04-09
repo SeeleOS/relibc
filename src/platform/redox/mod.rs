@@ -1321,6 +1321,10 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn timer_getoverrun(_timerid: timer_t) -> Result<c_int> {
+        Ok(0)
+    }
+
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
         let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
         let mut now = timespec::default();

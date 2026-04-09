@@ -1431,6 +1431,10 @@ impl Pal for Sys {
         timer::timer_delete(timerid)
     }
 
+    fn timer_getoverrun(timerid: timer_t) -> Result<c_int> {
+        timer::timer_getoverrun(timerid)
+    }
+
     fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
         timer::timer_gettime(timerid, value)
     }

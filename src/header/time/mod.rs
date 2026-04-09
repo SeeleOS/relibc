@@ -522,9 +522,12 @@ pub unsafe extern "C" fn timer_delete(timerid: timer_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
-    unimplemented!();
+    if timerid.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
+    Sys::timer_getoverrun(timerid).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
