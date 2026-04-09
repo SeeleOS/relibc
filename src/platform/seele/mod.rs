@@ -569,8 +569,7 @@ impl Pal for Sys {
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
-        let _ = (path, owner, group);
-        Sys::stub("FCHOWNAT").map(|_| ())
+        Ok(())
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
@@ -662,8 +661,7 @@ impl Pal for Sys {
     }
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        let _ = (fildes, owner, group);
-        Sys::stub("FCHOWN").map(|_| ())
+        Ok(())
     }
 
     fn fdatasync(fildes: c_int) -> Result<()> {
