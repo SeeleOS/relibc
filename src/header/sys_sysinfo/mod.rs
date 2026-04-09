@@ -28,6 +28,10 @@ pub struct sysinfo {
     pub _f: [c_char; 0],
 }
 
+pub extern "C" fn _cbindgen_export_sysinfo(info: sysinfo) {
+    let _ = info;
+}
+
 /// Minimal Linux-compatible `sysinfo()` stub.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sysinfo(info: *mut sysinfo) -> c_int {
