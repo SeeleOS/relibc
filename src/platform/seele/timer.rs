@@ -4,9 +4,7 @@ use seele_sys::{
     signal::Signal,
     syscalls::{
         misc::{get_current_time, time_since_boot},
-        timer::{
-            create_timer, delete_timer, get_timer_overrun, get_timer_state, set_timer_state,
-        },
+        timer::{create_timer, delete_timer, get_timer_overrun, get_timer_state, set_timer_state},
     },
     utils::process_result,
 };
@@ -112,8 +110,7 @@ fn timer_state_from_itimerspec(
 ) -> Result<TimerStateStruct> {
     let mut timer_state = TimerStateStruct::from(value.clone());
 
-    if !matches!(timer_state.state_type, TimerStateType::Disabled) && (flags & TIMER_ABSTIME) == 0
-    {
+    if !matches!(timer_state.state_type, TimerStateType::Disabled) && (flags & TIMER_ABSTIME) == 0 {
         timer_state.deadline = current_time_ns(time_type)?.saturating_add(timer_state.deadline);
     }
 
@@ -160,7 +157,10 @@ pub(super) fn timer_create(
     )))?;
 
     if !timerid.as_mut_ptr().is_null() {
-        let handle = Box::into_raw(Box::new(TimerHandle { id: timer_id as u64, time_type }));
+        let handle = Box::into_raw(Box::new(TimerHandle {
+            id: timer_id as u64,
+            time_type,
+        }));
         unsafe {
             timerid.write(handle as *mut c_void);
         }
