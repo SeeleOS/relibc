@@ -1091,6 +1091,7 @@ impl Pal for Sys {
         }
 
         if (flags & (MAP_FIXED | MAP_FIXED_NOREPLACE)) != 0 {
+            println!("map fixed rejected.");
             return Err(Errno(ENOSYS));
         }
 
