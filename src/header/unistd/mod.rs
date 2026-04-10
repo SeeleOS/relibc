@@ -1043,7 +1043,7 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
     {
         return -1;
     }
-    pgrp
+    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/truncate.html>.
