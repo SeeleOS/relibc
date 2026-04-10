@@ -73,6 +73,7 @@ pub mod setjmp;
 pub mod sgtty;
 pub mod shadow;
 pub mod signal;
+pub mod spawn;
 // TODO: spawn.h
 // TODO: stdalign.h (likely C implementation)
 // stdarg.h implemented in C
