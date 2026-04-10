@@ -587,6 +587,19 @@ pub unsafe extern "C" fn getlogin() -> *mut c_char {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
+    #[cfg(target_os = "seele")]
+    {
+        const LOGIN: &[u8] = b"seele\0";
+        if namesize < LOGIN.len() || name.is_null() {
+            platform::ERRNO.set(errno::ERANGE);
+            return -1;
+        }
+        unsafe {
+            core::ptr::copy_nonoverlapping(LOGIN.as_ptr().cast::<c_char>(), name, LOGIN.len());
+        }
+        return 0;
+    }
+
     //TODO: Determine correct getlogin result on Redox
     platform::ERRNO.set(errno::ENOENT);
     -1
