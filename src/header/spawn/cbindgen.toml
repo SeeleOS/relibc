@@ -1,5 +1,9 @@
 sys_includes = ["features.h", "fcntl.h", "sched.h", "signal.h", "sys/types.h"]
 include_guard = "_RELIBC_SPAWN_H"
+trailer = """
+typedef struct posix_spawnattr_t posix_spawnattr_t;
+typedef struct posix_spawn_file_actions_t posix_spawn_file_actions_t;
+"""
 language = "C"
 style = "Tag"
 no_includes = true
