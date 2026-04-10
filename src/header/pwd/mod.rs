@@ -142,7 +142,7 @@ fn seele_pwd_matches_uid(uid: uid_t) -> bool {
 
 #[cfg(target_os = "seele")]
 unsafe fn seele_pwd_matches_name(name: *const c_char) -> bool {
-    !name.is_null() && strcmp(name, SEELE_PW_NAME.as_ptr().cast()) == 0
+    !name.is_null() && unsafe { strcmp(name, SEELE_PW_NAME.as_ptr().cast()) } == 0
 }
 
 #[cfg(target_os = "seele")]
@@ -173,11 +173,13 @@ unsafe fn seele_pwd_copy_into(
 
     if size < REQUIRED {
         platform::ERRNO.set(errno::ERANGE);
-        *result = ptr::null_mut();
+        unsafe {
+            *result = ptr::null_mut();
+        }
         return -1;
     }
 
-    let buf = core::slice::from_raw_parts_mut(buf.cast::<u8>(), size);
+    let buf = unsafe { core::slice::from_raw_parts_mut(buf.cast::<u8>(), size) };
     let mut offset = 0;
 
     let copy_field = |dst: &mut [u8], offset: &mut usize, src: &[u8]| -> *mut c_char {
@@ -187,16 +189,18 @@ unsafe fn seele_pwd_copy_into(
         dst.as_mut_ptr().wrapping_add(start).cast()
     };
 
-    *out = passwd {
-        pw_name: copy_field(buf, &mut offset, SEELE_PW_NAME),
-        pw_passwd: copy_field(buf, &mut offset, SEELE_PW_PASSWD),
-        pw_uid: 0,
-        pw_gid: 0,
-        pw_gecos: copy_field(buf, &mut offset, SEELE_PW_GECOS),
-        pw_dir: copy_field(buf, &mut offset, SEELE_PW_DIR),
-        pw_shell: copy_field(buf, &mut offset, SEELE_PW_SHELL),
-    };
-    *result = out;
+    unsafe {
+        *out = passwd {
+            pw_name: copy_field(buf, &mut offset, SEELE_PW_NAME),
+            pw_passwd: copy_field(buf, &mut offset, SEELE_PW_PASSWD),
+            pw_uid: 0,
+            pw_gid: 0,
+            pw_gecos: copy_field(buf, &mut offset, SEELE_PW_GECOS),
+            pw_dir: copy_field(buf, &mut offset, SEELE_PW_DIR),
+            pw_shell: copy_field(buf, &mut offset, SEELE_PW_SHELL),
+        };
+        *result = out;
+    }
     0
 }
 
