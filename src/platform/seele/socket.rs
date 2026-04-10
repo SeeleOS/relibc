@@ -219,7 +219,11 @@ impl PalSocket for Sys {
         }
 
         let msg = unsafe { &*msg };
-        if !msg.msg_name.is_null() || msg.msg_namelen != 0 || !msg.msg_control.is_null() || msg.msg_controllen != 0 {
+        if !msg.msg_name.is_null()
+            || msg.msg_namelen != 0
+            || !msg.msg_control.is_null()
+            || msg.msg_controllen != 0
+        {
             return Err(Errno(EINVAL));
         }
 
