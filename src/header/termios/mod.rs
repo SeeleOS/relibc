@@ -111,6 +111,7 @@ impl self::termios {
     pub fn as_seele_terminal_info(&self, current: SeeleTerminalInfo) -> SeeleTerminalInfo {
         let echo = self.c_lflag & ECHO as u32 != 0;
         let canonical = self.c_lflag & ICANON as u32 != 0;
+        let send_sig_on_special_chars = self.c_lflag & ISIG as u32 != 0;
         let echo_newline = echo || self.c_lflag & ECHONL as u32 != 0;
         let echo_delete = self.c_lflag & (ECHO | ECHOE) as u32 == (ECHO | ECHOE) as u32;
 
@@ -119,6 +120,7 @@ impl self::termios {
             cols: current.cols,
             echo,
             canonical,
+            send_sig_on_special_chars,
             echo_newline,
             echo_delete,
         }
@@ -131,6 +133,12 @@ impl From<SeeleTerminalInfo> for termios {
 
         if !terminal_info.canonical {
             termios.set_noncanonical_mode();
+        }
+
+        if terminal_info.send_sig_on_special_chars {
+            termios.c_lflag |= ISIG as u32;
+        } else {
+            termios.c_lflag &= !(ISIG as u32);
         }
 
         if terminal_info.echo {
