@@ -121,6 +121,85 @@ enum Cause {
 
 static READER: RawCell<Option<BufReader<File>>> = RawCell::new(None);
 
+#[cfg(target_os = "seele")]
+static mut SEELE_GETPWENT_DONE: bool = false;
+
+#[cfg(target_os = "seele")]
+const SEELE_PW_NAME: &[u8] = b"seele\0";
+#[cfg(target_os = "seele")]
+const SEELE_PW_PASSWD: &[u8] = b"x\0";
+#[cfg(target_os = "seele")]
+const SEELE_PW_GECOS: &[u8] = b"seele\0";
+#[cfg(target_os = "seele")]
+const SEELE_PW_DIR: &[u8] = b"/home\0";
+#[cfg(target_os = "seele")]
+const SEELE_PW_SHELL: &[u8] = b"/programs/bash\0";
+
+#[cfg(target_os = "seele")]
+fn seele_pwd_matches_uid(uid: uid_t) -> bool {
+    uid == 0
+}
+
+#[cfg(target_os = "seele")]
+unsafe fn seele_pwd_matches_name(name: *const c_char) -> bool {
+    !name.is_null() && strcmp(name, SEELE_PW_NAME.as_ptr().cast()) == 0
+}
+
+#[cfg(target_os = "seele")]
+fn seele_pwd_ref() -> passwd {
+    passwd {
+        pw_name: SEELE_PW_NAME.as_ptr().cast_mut().cast(),
+        pw_passwd: SEELE_PW_PASSWD.as_ptr().cast_mut().cast(),
+        pw_uid: 0,
+        pw_gid: 0,
+        pw_gecos: SEELE_PW_GECOS.as_ptr().cast_mut().cast(),
+        pw_dir: SEELE_PW_DIR.as_ptr().cast_mut().cast(),
+        pw_shell: SEELE_PW_SHELL.as_ptr().cast_mut().cast(),
+    }
+}
+
+#[cfg(target_os = "seele")]
+unsafe fn seele_pwd_copy_into(
+    out: *mut passwd,
+    buf: *mut c_char,
+    size: size_t,
+    result: *mut *mut passwd,
+) -> c_int {
+    const REQUIRED: usize = SEELE_PW_NAME.len()
+        + SEELE_PW_PASSWD.len()
+        + SEELE_PW_GECOS.len()
+        + SEELE_PW_DIR.len()
+        + SEELE_PW_SHELL.len();
+
+    if size < REQUIRED {
+        platform::ERRNO.set(errno::ERANGE);
+        *result = ptr::null_mut();
+        return -1;
+    }
+
+    let buf = core::slice::from_raw_parts_mut(buf.cast::<u8>(), size);
+    let mut offset = 0;
+
+    let copy_field = |dst: &mut [u8], offset: &mut usize, src: &[u8]| -> *mut c_char {
+        let start = *offset;
+        dst[start..start + src.len()].copy_from_slice(src);
+        *offset += src.len();
+        dst.as_mut_ptr().wrapping_add(start).cast()
+    };
+
+    *out = passwd {
+        pw_name: copy_field(buf, &mut offset, SEELE_PW_NAME),
+        pw_passwd: copy_field(buf, &mut offset, SEELE_PW_PASSWD),
+        pw_uid: 0,
+        pw_gid: 0,
+        pw_gecos: copy_field(buf, &mut offset, SEELE_PW_GECOS),
+        pw_dir: copy_field(buf, &mut offset, SEELE_PW_DIR),
+        pw_shell: copy_field(buf, &mut offset, SEELE_PW_SHELL),
+    };
+    *result = out;
+    0
+}
+
 fn parsed<I, O>(buf: Option<I>) -> Option<O>
 where
     I: core::borrow::Borrow<[u8]>,
@@ -229,6 +308,11 @@ unsafe fn mux(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn endpwent() {
+    #[cfg(target_os = "seele")]
+    unsafe {
+        SEELE_GETPWENT_DONE = false;
+    }
+
     unsafe {
         READER.unsafe_set(None);
     }
@@ -237,6 +321,16 @@ pub extern "C" fn endpwent() {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn getpwent() -> *mut passwd {
+    #[cfg(target_os = "seele")]
+    unsafe {
+        if SEELE_GETPWENT_DONE {
+            return ptr::null_mut();
+        }
+        SEELE_GETPWENT_DONE = true;
+        PASSWD.unsafe_set(seele_pwd_ref());
+        return PASSWD.as_mut_ptr();
+    }
+
     let reader = match unsafe { &mut *READER.as_mut_ptr() } {
         Some(reader) => reader,
         None => {
@@ -259,6 +353,17 @@ pub extern "C" fn getpwent() -> *mut passwd {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwnam.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
+    #[cfg(target_os = "seele")]
+    {
+        if !unsafe { seele_pwd_matches_name(name) } {
+            return ptr::null_mut();
+        }
+        unsafe {
+            PASSWD.unsafe_set(seele_pwd_ref());
+            return PASSWD.as_mut_ptr();
+        }
+    }
+
     pwd_lookup(|parts| unsafe { strcmp(parts.pw_name, name) } == 0, None)
         .map(|res| res.into_global())
         .unwrap_or(ptr::null_mut())
@@ -273,6 +378,17 @@ pub unsafe extern "C" fn getpwnam_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
+    #[cfg(target_os = "seele")]
+    {
+        if !unsafe { seele_pwd_matches_name(name) } {
+            unsafe {
+                *result = ptr::null_mut();
+            }
+            return 0;
+        }
+        return unsafe { seele_pwd_copy_into(out, buf, size, result) };
+    }
+
     unsafe {
         mux(
             pwd_lookup(
@@ -291,6 +407,17 @@ pub unsafe extern "C" fn getpwnam_r(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwuid.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
+    #[cfg(target_os = "seele")]
+    {
+        if !seele_pwd_matches_uid(uid) {
+            return ptr::null_mut();
+        }
+        unsafe {
+            PASSWD.unsafe_set(seele_pwd_ref());
+            return PASSWD.as_mut_ptr();
+        }
+    }
+
     pwd_lookup(|parts| parts.pw_uid == uid, None)
         .map(|res| res.into_global())
         .unwrap_or(ptr::null_mut())
@@ -305,7 +432,17 @@ pub unsafe extern "C" fn getpwuid_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
-    let slice = unsafe { core::slice::from_raw_parts_mut(buf.cast::<u8>(), size) };
+    #[cfg(target_os = "seele")]
+    {
+        if !seele_pwd_matches_uid(uid) {
+            unsafe {
+                *result = ptr::null_mut();
+            }
+            return 0;
+        }
+        return unsafe { seele_pwd_copy_into(out, buf, size, result) };
+    }
+
     unsafe {
         mux(
             pwd_lookup(
@@ -324,6 +461,12 @@ pub unsafe extern "C" fn getpwuid_r(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn setpwent() {
+    #[cfg(target_os = "seele")]
+    unsafe {
+        SEELE_GETPWENT_DONE = false;
+        return;
+    }
+
     if let Some(reader) = unsafe { &mut *READER.as_mut_ptr() } {
         let _ = reader.seek(SeekFrom::Start(0));
     }
