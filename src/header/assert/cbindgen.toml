@@ -5,7 +5,14 @@
 # features.h included for Rust never type (no return)
 sys_includes = ["features.h"]
 include_guard = "_RELIBC_ASSERT_H"
-trailer = "#include <bits/assert.h>"
+trailer = """
+#include <bits/assert.h>
+
+#if !defined(__cplusplus)
+# undef static_assert
+# define static_assert _Static_assert
+#endif
+"""
 language = "C"
 style = "Tag"
 no_includes = true
