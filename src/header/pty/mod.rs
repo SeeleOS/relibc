@@ -4,10 +4,15 @@
 
 use core::{mem, ptr, slice};
 
+use seele_sys::{syscalls::misc::create_pty, utils::process_result};
+
 use crate::{
-    header::{fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp},
+    header::{
+        errno::ENOSYS, fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp,
+    },
     platform::{
-        self,
+        self, ERRNO,
+        sys::e_raw,
         types::{c_char, c_int, c_void},
     },
 };
@@ -29,28 +34,15 @@ pub unsafe extern "C" fn openpty(
     termp: *const termios::termios,
     winp: *const sys_ioctl::winsize,
 ) -> c_int {
-    let mut tmp_name = [0; limits::PATH_MAX];
-    let name = if !namep.is_null() {
-        unsafe { slice::from_raw_parts_mut(namep.cast::<u8>(), limits::PATH_MAX) }
-    } else {
-        &mut tmp_name
-    };
-
-    let (master, slave) = match unsafe { imp::openpty(name) } {
-        Ok(ok) => ok,
-        Err(()) => return -1,
-    };
-
-    if !termp.is_null() {
-        unsafe { termios::tcsetattr(slave, termios::TCSANOW, termp) };
+    if winp != core::ptr::null() || termp != core::ptr::null() || namep != core::ptr::null_mut() {
+        ERRNO.set(ENOSYS);
+        return -1;
     }
 
-    if !winp.is_null() {
-        unsafe { sys_ioctl::ioctl(slave, sys_ioctl::TIOCSWINSZ, winp as *mut c_void) };
+    if let Err(crate::error::Errno(errno)) = e_raw(process_result(create_pty(amaster, aslave))) {
+        ERRNO.set(errno);
+        return -1;
     }
-
-    unsafe { *amaster = master };
-    unsafe { *aslave = slave };
 
     0
 }
