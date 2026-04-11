@@ -873,8 +873,21 @@ impl Pal for Sys {
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
-        let _ = (buf, flags);
-        Sys::stub("GETRANDOM")
+        let _ = flags;
+
+        let now = get_current_time().unwrap_or_default();
+        let pid = get_process_id().unwrap_or_default();
+        let tid = get_thread_id().unwrap_or_default();
+        let mut state = now ^ (pid << 16) ^ (tid << 32) ^ (buf.len() as u64);
+
+        for byte in buf.iter_mut() {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            *byte = state as u8;
+        }
+
+        Ok(buf.len())
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
