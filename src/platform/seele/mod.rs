@@ -45,8 +45,9 @@ use crate::{
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
             FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, FBIOPUTCMAP,
-            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGWINSZ, TIOCSPGRP, TIOCSWINSZ,
-            fb_bitfield, fb_cmap, fb_fix_screeninfo, fb_var_screeninfo, winsize,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGSID, TIOCGWINSZ, TIOCSPGRP,
+            TIOCSCTTY, TIOCSWINSZ, fb_bitfield, fb_cmap, fb_fix_screeninfo, fb_var_screeninfo,
+            winsize,
         },
         sys_mman::{
             MAP_ANON, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_PRIVATE, MAP_STACK, MAP_TYPE, PROT_EXEC,
@@ -474,6 +475,28 @@ impl Sys {
 
                 Ok(0)
             },
+            TIOCGSID => unsafe {
+                let sid = e_raw(process_result(configurate_object(
+                    fd as u64,
+                    ConfigCommand::TermGetActiveGroup as u64,
+                    core::ptr::null_mut(),
+                )))?;
+
+                out.cast::<pid_t>().write(sid as pid_t);
+                Ok(0)
+            },
+            TIOCSCTTY => {
+                let pid = getpid();
+                let group = e_raw(process_result(get_process_group_id(pid as u64)))?;
+
+                e_raw(process_result(configurate_object(
+                    fd as u64,
+                    ConfigCommand::TermSetActiveGroup as u64,
+                    group as *mut u8,
+                )))?;
+
+                Ok(0)
+            },
             _ => e_raw(process_result(configurate_object(
                 fd as u64,
                 request,
@@ -875,9 +898,9 @@ impl Pal for Sys {
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
         let _ = flags;
 
-        let now = get_current_time().unwrap_or_default();
-        let pid = get_process_id().unwrap_or_default();
-        let tid = get_thread_id().unwrap_or_default();
+        let now = get_current_time().unwrap_or_default() as u64;
+        let pid = get_process_id().unwrap_or_default() as u64;
+        let tid = get_thread_id().unwrap_or_default() as u64;
         let mut state = now ^ (pid << 16) ^ (tid << 32) ^ (buf.len() as u64);
 
         for byte in buf.iter_mut() {
@@ -962,9 +985,12 @@ impl Pal for Sys {
         Sys::stub("GETRUSAGE").map(|_| ())
     }
 
-    fn getsid(pid: pid_t) -> Result<pid_t> {
-        let _ = pid;
-        Ok(Sys::stub("GETSID")? as pid_t)
+    fn getsid(mut pid: pid_t) -> Result<pid_t> {
+        if pid == 0 {
+            pid = getpid();
+        }
+
+        e_raw(process_result(get_process_group_id(pid as u64))).map(|f| f as pid_t)
     }
 
     fn gettid() -> pid_t {
@@ -1422,7 +1448,14 @@ impl Pal for Sys {
     }
 
     fn setsid() -> Result<c_int> {
-        Ok(Sys::stub("SETSID")? as c_int)
+        let pid = getpid();
+
+        e_raw(process_result(set_process_group_id(
+            pid as u64,
+            pid as u64,
+        )))?;
+
+        Ok(pid)
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {

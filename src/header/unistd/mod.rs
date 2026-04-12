@@ -26,8 +26,8 @@ use crate::{
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
-            c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
-            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+            c_char, c_int, c_long, c_short, c_uint, c_ulong, c_ulonglong, c_void, gid_t, off_t,
+            pid_t, size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
         },
     },
 };
@@ -237,6 +237,21 @@ pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
         return -1;
     }
 
+    0
+}
+
+/// Linux-specific I/O privilege helpers used by Xorg's legacy x86 path.
+///
+/// Seele does not expose port-I/O permissions separately, so treat these as
+/// successful no-ops for now.
+#[unsafe(no_mangle)]
+pub extern "C" fn ioperm(_from: c_ulong, _num: c_ulong, _turn_on: c_int) -> c_int {
+    0
+}
+
+/// See [`ioperm`].
+#[unsafe(no_mangle)]
+pub extern "C" fn iopl(_level: c_int) -> c_int {
     0
 }
 
@@ -1096,9 +1111,24 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
         return errno::ERANGE;
     }
 
-    let len = Sys::fpath(fildes, &mut name[..namesize - 1])
-        .map(|read| read as ssize_t)
-        .or_minus_one_errno();
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1]).map(|read| read as ssize_t);
+    let len = match len {
+        Ok(len) => len,
+        Err(_) => {
+            if isatty(fildes) == 0 {
+                return -platform::ERRNO.get();
+            }
+
+            const FALLBACK: &[u8] = b"/dev/tty";
+            if FALLBACK.len() + 1 > namesize {
+                return errno::ERANGE;
+            }
+
+            name[..FALLBACK.len()].copy_from_slice(FALLBACK);
+            name[FALLBACK.len()] = 0;
+            return 0;
+        }
+    };
     if len < 0 {
         return -platform::ERRNO.get();
     }

@@ -114,6 +114,8 @@ impl self::termios {
         let send_sig_on_special_chars = self.c_lflag & ISIG as u32 != 0;
         let echo_newline = echo || self.c_lflag & ECHONL as u32 != 0;
         let echo_delete = self.c_lflag & (ECHO | ECHOE) as u32 == (ECHO | ECHOE) as u32;
+        let map_output_newline_to_crlf =
+            self.c_oflag & (OPOST | ONLCR) as u32 == (OPOST | ONLCR) as u32;
 
         SeeleTerminalInfo {
             rows: current.rows,
@@ -123,6 +125,7 @@ impl self::termios {
             send_sig_on_special_chars,
             echo_newline,
             echo_delete,
+            map_output_newline_to_crlf,
         }
     }
 }
@@ -157,6 +160,12 @@ impl From<SeeleTerminalInfo> for termios {
             termios.c_lflag |= ECHOE as u32;
         } else {
             termios.c_lflag &= !(ECHOE as u32);
+        }
+
+        if terminal_info.map_output_newline_to_crlf {
+            termios.c_oflag |= (OPOST | ONLCR) as u32;
+        } else {
+            termios.c_oflag &= !((OPOST | ONLCR) as u32);
         }
 
         termios
