@@ -35,6 +35,7 @@
 #define DBL_MIN_10_EXP (-307)
 #define DBL_MAX_10_EXP 308
 
+#define DECIMAL_DIG 21
 #define LDBL_HAS_SUBNORM 1
 #define LDBL_DECIMAL_DIG DECIMAL_DIG
 
@@ -45,7 +46,10 @@
 #define LDBL_EPSILON 1.0842021724855044340e-19L
 
 #define LDBL_MANT_DIG 64
+#define LDBL_DIG 18
 #define LDBL_MIN_EXP (-16381)
 #define LDBL_MAX_EXP 16384
+#define LDBL_MIN_10_EXP (-4931)
+#define LDBL_MAX_10_EXP 4932
 
 #endif
