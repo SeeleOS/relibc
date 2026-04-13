@@ -14,6 +14,7 @@ use crate::{
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
+        sys_times::tms,
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
@@ -21,7 +22,6 @@ use crate::{
     out::Out,
 };
 use core::{num::NonZeroU64, ptr};
-// use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
     header::{bits_time::timespec, sys_utsname::utsname},
@@ -76,9 +76,9 @@ impl Sys {
         Ok(e_raw(syscall!(IOCTL, fd, request, out))? as c_int)
     }
 
-    // fn times(out: *mut tms) -> clock_t {
-    //     unsafe { syscall!(TIMES, out) as clock_t }
-    // }
+    fn times(_out: *mut tms) -> clock_t {
+        unimplemented!()
+    }
 }
 
 impl Pal for Sys {

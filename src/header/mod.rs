@@ -107,7 +107,7 @@ pub mod sys_sysinfo;
 pub mod sys_time;
 #[deprecated]
 pub mod sys_timeb;
-//pub mod sys_times;
+pub mod sys_times;
 pub mod sys_vt;
 pub mod arch_aarch64_user;
 pub mod arch_riscv64_user;

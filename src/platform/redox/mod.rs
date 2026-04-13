@@ -47,6 +47,7 @@ use crate::{
         sys_stat::{S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
+        sys_times::tms,
         sys_utsname::{UTSLENGTH, utsname},
         time::{TIMER_ABSTIME, itimerspec, timer_internal_t},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
@@ -106,6 +107,10 @@ static CLONE_LOCK: RwLock<()> = RwLock::new(());
 pub struct Sys;
 
 impl Pal for Sys {
+    fn times(_out: *mut tms) -> clock_t {
+        unimplemented!()
+    }
+
     fn access(path: CStr, mode: c_int) -> Result<()> {
         let fd = FdGuard::new(Sys::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
 

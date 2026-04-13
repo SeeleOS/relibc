@@ -12,6 +12,7 @@ use crate::{
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::timezone,
+        sys_times::tms,
         sys_utsname::utsname,
         time::itimerspec,
     },
@@ -164,6 +165,8 @@ pub trait Pal {
     fn gettid() -> pid_t;
 
     fn gettimeofday(tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()>;
+
+    fn times(out: *mut tms) -> clock_t;
 
     fn getuid() -> uid_t;
 
