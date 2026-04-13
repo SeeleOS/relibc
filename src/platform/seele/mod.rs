@@ -591,8 +591,22 @@ impl Pal for Sys {
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        let _ = (clk_id, res);
-        Sys::stub("CLOCK_GETRES").map(|_| ())
+        match clk_id {
+            CLOCK_REALTIME | CLOCK_MONOTONIC => {}
+            _ => return Err(Errno(EINVAL)),
+        }
+
+        if let Some(mut res) = res {
+            unsafe {
+                let ts = res.as_mut_ptr();
+                if !ts.is_null() {
+                    (*ts).tv_sec = 0;
+                    (*ts).tv_nsec = 1;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn clock_gettime(clk_id: clockid_t, mut tp: Out<timespec>) -> Result<()> {
