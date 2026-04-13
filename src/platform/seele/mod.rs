@@ -45,8 +45,8 @@ use crate::{
         sys_ioctl::{
             FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR, FBIOBLANK, FBIOGET_FSCREENINFO,
             FBIOGET_VSCREENINFO, FBIOGETCMAP, FBIOPAN_DISPLAY, FBIOPUT_VSCREENINFO, FBIOPUTCMAP,
-            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGSID, TIOCGWINSZ, TIOCSPGRP,
-            TIOCSCTTY, TIOCSWINSZ, fb_bitfield, fb_cmap, fb_fix_screeninfo, fb_var_screeninfo,
+            TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPGRP, TIOCGSID, TIOCGWINSZ, TIOCSCTTY,
+            TIOCSPGRP, TIOCSWINSZ, fb_bitfield, fb_cmap, fb_fix_screeninfo, fb_var_screeninfo,
             winsize,
         },
         sys_mman::{
@@ -69,6 +69,7 @@ use crate::{
     pthread::set_cancel_state,
 };
 use core::{
+    arch::asm,
     num::NonZeroU64,
     ptr,
     str::from_utf8,
@@ -89,12 +90,6 @@ mod unwind_stub;
 
 pub use unwind_stub::*;
 
-const SYS_CLONE: usize = 56;
-const CLONE_VM: usize = 0x0100;
-const CLONE_FS: usize = 0x0200;
-const CLONE_FILES: usize = 0x0400;
-const CLONE_SIGHAND: usize = 0x0800;
-const CLONE_THREAD: usize = 0x00010000;
 const PRINT_STUB_MESSAGE: bool = true;
 static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
 
@@ -496,7 +491,7 @@ impl Sys {
                 )))?;
 
                 Ok(0)
-            },
+            }
             _ => e_raw(process_result(configurate_object(
                 fd as u64,
                 request,
@@ -1331,7 +1326,51 @@ impl Pal for Sys {
         stack: *mut usize,
         _os_specific: &mut OsSpecific,
     ) -> Result<crate::pthread::OsTid> {
-        unimplemented!()
+        let tid;
+        unsafe {
+            asm!("
+                syscall
+
+                test rax, rax
+                jnz 2f
+
+                pop rax
+                pop rdi
+                pop rsi
+                pop rdx
+                pop rcx
+                pop r8
+                pop r9
+
+                call rax
+
+                mov rax, {exit_nr}
+                xor rdi, rdi
+                syscall
+
+                ud2
+
+                2:
+                ",
+                inlateout("rax") seele_sys::numbers::SyscallNumber::ThreadClone as usize => tid,
+                in("rdi") stack as usize,
+                lateout("rcx") _,
+                lateout("r11") _,
+                lateout("rsi") _,
+                lateout("rdx") _,
+                lateout("r8") _,
+                lateout("r9") _,
+                lateout("r10") _,
+                lateout("r12") _,
+                lateout("r13") _,
+                lateout("r14") _,
+                lateout("r15") _,
+                exit_nr = const seele_sys::numbers::SyscallNumber::Exit as usize,
+            );
+        }
+        let tid = e_raw(tid)?;
+
+        Ok(crate::pthread::OsTid { thread_id: tid })
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -1450,10 +1489,7 @@ impl Pal for Sys {
     fn setsid() -> Result<c_int> {
         let pid = getpid();
 
-        e_raw(process_result(set_process_group_id(
-            pid as u64,
-            pid as u64,
-        )))?;
+        e_raw(process_result(set_process_group_id(pid as u64, pid as u64)))?;
 
         Ok(pid)
     }
