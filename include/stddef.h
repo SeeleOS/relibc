@@ -1,6 +1,6 @@
-#ifndef _STDDEF_H
+#ifndef _RELIBC_STDDEF_H
+#define _RELIBC_STDDEF_H
 #define _STDDEF_H
-#include <stdint.h>
 
 #define NULL 0
 
@@ -25,4 +25,4 @@ typedef struct { long long __ll; long double __ld; } max_align_t;
 
 #define offsetof(type, member) __builtin_offsetof(type, member)
 
-#endif /* _STDDEF_H */
+#endif /* _RELIBC_STDDEF_H */

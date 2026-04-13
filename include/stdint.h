@@ -25,7 +25,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
  * ISO C Standard:  7.18  Integer types  <stdint.h>
  */
 
-#ifndef _STDINT_H
+#ifndef _RELIBC_STDINT_H
+#define _RELIBC_STDINT_H
 #define _STDINT_H
 
 /* 7.8.1.1 Exact-width integer types */
@@ -376,4 +377,4 @@ typedef __UINTMAX_TYPE__ uintmax_t;
 
 typedef long sig_atomic_t;
 
-#endif /* _GCC_STDINT_H */
+#endif /* _RELIBC_STDINT_H */
