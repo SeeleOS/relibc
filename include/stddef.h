@@ -2,7 +2,11 @@
 #define _RELIBC_STDDEF_H
 #define _STDDEF_H
 
+#ifdef __cplusplus
 #define NULL 0
+#else
+#define NULL ((void*)0)
+#endif
 
 #ifndef __PTRDIFF_TYPE__
 #define __PTRDIFF_TYPE__ long int
