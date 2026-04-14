@@ -98,6 +98,8 @@ pub type time_t = c_longlong;
 pub type pid_t = c_int;
 /// The `id_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type id_t = c_uint;
+/// The `key_t` type provided in [`sys/ipc.h`](crate::header::sys_ipc).
+pub type key_t = c_int;
 /// The `gid_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type gid_t = c_int;
 /// The `uid_t` type provided in [`sys/types.h`](crate::header::sys_types).
