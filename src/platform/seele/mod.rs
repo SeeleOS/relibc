@@ -501,18 +501,6 @@ impl Sys {
         }
     }
 
-    fn times(out: *mut tms) -> clock_t {
-        if !out.is_null() {
-            unsafe {
-                out.write_bytes(0, 1);
-            }
-        }
-
-        // sysconf(_SC_CLK_TCK) returns 100, so one clock tick is 10 ms.
-        let ns = e_raw(process_result(time_since_boot())).unwrap_or(0) as u64;
-        (ns / 10_000_000) as clock_t
-    }
-
     pub(crate) fn sigprocmask_stub(
         how: c_int,
         set: Option<&sigset_t>,
@@ -545,6 +533,18 @@ impl Sys {
 }
 
 impl Pal for Sys {
+    fn times(out: *mut tms) -> clock_t {
+        if !out.is_null() {
+            unsafe {
+                out.write_bytes(0, 1);
+            }
+        }
+
+        // sysconf(_SC_CLK_TCK) returns 100, so one clock tick is 10 ms.
+        let ns = e_raw(process_result(time_since_boot())).unwrap_or(0) as u64;
+        (ns / 10_000_000) as clock_t
+    }
+
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
         match mode {
