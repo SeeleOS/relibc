@@ -95,6 +95,19 @@ pub unsafe extern "C" fn mmap(
     }
 }
 
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mmap64(
+    addr: *mut c_void,
+    len: size_t,
+    prot: c_int,
+    flags: c_int,
+    fildes: c_int,
+    off: off_t,
+) -> *mut c_void {
+    unsafe { mmap(addr, len, prot, flags, fildes, off) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mprotect.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -> c_int {

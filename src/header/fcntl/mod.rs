@@ -110,6 +110,35 @@ pub unsafe extern "C" fn openat(
     Sys::openat(dirfd, path, oflag, mode).or_minus_one_errno()
 }
 
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn open64(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
+    let mode = if oflag & O_CREAT == O_CREAT {
+        unsafe { __valist.arg::<mode_t>() }
+    } else {
+        0
+    };
+
+    unsafe { open(path, oflag, mode) }
+}
+
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openat64(
+    dirfd: c_int,
+    path: *const c_char,
+    oflag: c_int,
+    mut __valist: ...,
+) -> c_int {
+    let mode = if oflag & O_CREAT == O_CREAT {
+        unsafe { __valist.arg::<mode_t>() }
+    } else {
+        0
+    };
+
+    unsafe { openat(dirfd, path, oflag, mode) }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(_: flock) {}
 

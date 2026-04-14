@@ -17,7 +17,7 @@ use crate::{
         linker::{DlError, ObjectHandle, Resolve, ScopeKind},
         tcb::Tcb,
     },
-    platform::types::{c_char, c_int, c_void},
+    platform::types::{c_char, c_int, c_void, size_t, uintptr_t},
 };
 
 pub const RTLD_LAZY: c_int = 1 << 0;
@@ -51,6 +51,19 @@ pub struct Dl_info_t {
 /// alias as per spec update: <https://www.austingroupbugs.net/view.php?id=1847>
 pub type Dl_info = Dl_info_t;
 
+/// Minimal Linux-compatible `dl_phdr_info` definition for backtrace consumers.
+#[repr(C)]
+pub struct dl_phdr_info {
+    pub dlpi_addr: uintptr_t,
+    pub dlpi_name: *const c_char,
+    pub dlpi_phdr: *const c_void,
+    pub dlpi_phnum: u16,
+    pub dlpi_adds: u64,
+    pub dlpi_subs: u64,
+    pub dlpi_tls_modid: size_t,
+    pub dlpi_tls_data: *mut c_void,
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dladdr(_addr: *const c_void, info: *mut Dl_info_t) -> c_int {
@@ -61,6 +74,15 @@ pub unsafe extern "C" fn dladdr(_addr: *const c_void, info: *mut Dl_info_t) -> c
         (*info).dli_sname = ptr::null();
         (*info).dli_saddr = ptr::null_mut();
     }
+    0
+}
+
+/// Linux extension used by Rust backtrace support.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dl_iterate_phdr(
+    _callback: Option<unsafe extern "C" fn(*mut dl_phdr_info, size_t, *mut c_void) -> c_int>,
+    _data: *mut c_void,
+) -> c_int {
     0
 }
 

@@ -265,14 +265,19 @@ pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_nanosleep.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn clock_nanosleep(
     clock_id: clockid_t,
     flags: c_int,
     rqtp: *const timespec,
     rmtp: *mut timespec,
 ) -> c_int {
-    unimplemented!();
+    if flags != 0 || (clock_id != CLOCK_REALTIME && clock_id != CLOCK_MONOTONIC) {
+        platform::ERRNO.set(crate::header::errno::ENOSYS);
+        return -1;
+    }
+
+    unsafe { nanosleep(rqtp, rmtp) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.

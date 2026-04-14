@@ -134,6 +134,11 @@ pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) ->
     unsafe { fstat(fildes, buf) }
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fstat64(fildes: c_int, buf: *mut stat) -> c_int {
+    unsafe { fstat(fildes, buf) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/futimens.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
@@ -172,6 +177,16 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __lxstat(_ver: c_int, path: *const c_char, buf: *mut stat) -> c_int {
+    unsafe { lstat(path, buf) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lstat64(path: *const c_char, buf: *mut stat) -> c_int {
+    unsafe { lstat(path, buf) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdirat.html>.
@@ -245,6 +260,26 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __xstat(_ver: c_int, file: *const c_char, buf: *mut stat) -> c_int {
+    unsafe { stat(file, buf) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn stat64(file: *const c_char, buf: *mut stat) -> c_int {
+    unsafe { stat(file, buf) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fstatat64(
+    fildes: c_int,
+    path: *const c_char,
+    buf: *mut stat,
+    flags: c_int,
+) -> c_int {
+    unsafe { fstatat(fildes, path, buf, flags) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/umask.html>.

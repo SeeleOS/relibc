@@ -4,10 +4,12 @@
 
 use crate::{
     error::ResultExt,
+    header::errno::{EINVAL, ENOSYS},
     header::bits_time::timespec,
     platform::{
+        self,
         Pal, Sys,
-        types::{c_int, pid_t},
+        types::{c_int, pid_t, size_t},
     },
 };
 
@@ -70,6 +72,28 @@ pub extern "C" fn sched_setscheduler(
 #[unsafe(no_mangle)]
 pub extern "C" fn sched_yield() -> c_int {
     Sys::sched_yield().map(|()| 0).or_minus_one_errno()
+}
+
+/// Linux extension. Report a single available CPU until the kernel grows a real affinity API.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sched_getaffinity(
+    pid: pid_t,
+    cpusetsize: size_t,
+    mask: *mut core::ffi::c_void,
+) -> c_int {
+    if pid != 0 && pid != Sys::getpid() {
+        platform::ERRNO.set(ENOSYS);
+        return -1;
+    }
+    if mask.is_null() || cpusetsize == 0 {
+        platform::ERRNO.set(EINVAL);
+        return -1;
+    }
+
+    let bytes = unsafe { core::slice::from_raw_parts_mut(mask.cast::<u8>(), cpusetsize) };
+    bytes.fill(0);
+    bytes[0] = 1;
+    0
 }
 
 #[unsafe(no_mangle)]

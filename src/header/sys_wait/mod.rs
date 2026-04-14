@@ -4,10 +4,12 @@
 
 use crate::{
     error::ResultExt,
+    header::signal::siginfo_t,
     out::Out,
     platform::{
+        self,
         Pal, Sys,
-        types::{c_int, pid_t},
+        types::{c_int, id_t, pid_t},
     },
 };
 
@@ -30,19 +32,52 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
     unsafe { waitpid(!0, stat_loc, 0) }
 }
 
-/*
- * TODO: implement idtype_t, id_t, and siginfo_t
- *
- * #[unsafe(no_mangle)]
- * pub unsafe extern "C" fn waitid(
- *     idtype: idtype_t,
- *     id: id_t,
- *     infop: siginfo_t,
- *     options: c_int
- *  ) -> c_int {
- *      unimplemented!();
- *  }
- */
+pub type idtype_t = c_int;
+
+pub const P_ALL: idtype_t = 0;
+pub const P_PID: idtype_t = 1;
+pub const P_PGID: idtype_t = 2;
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn waitid(
+    idtype: idtype_t,
+    id: id_t,
+    infop: *mut siginfo_t,
+    options: c_int,
+) -> c_int {
+    let pid = match idtype {
+        P_ALL => !0,
+        P_PID => id as pid_t,
+        P_PGID => -(id as pid_t),
+        _ => {
+            platform::ERRNO.set(crate::header::errno::EINVAL);
+            return -1;
+        }
+    };
+
+    let mut status = 0;
+    let waited = Sys::waitpid(pid, Some(Out::from_mut(&mut status)), options).or_minus_one_errno();
+    if waited < 0 {
+        return -1;
+    }
+
+    if !infop.is_null() {
+        unsafe {
+            *infop = siginfo_t {
+                si_signo: 0,
+                si_errno: 0,
+                si_code: 0,
+                si_pid: waited,
+                si_uid: 0,
+                si_addr: core::ptr::null_mut(),
+                si_status: status,
+                si_value: crate::header::signal::sigval { sival_int: 0 },
+            };
+        }
+    }
+
+    0
+}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/waitpid.html>.
 #[unsafe(no_mangle)]

@@ -396,6 +396,16 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
     0
 }
 
+/// glibc compatibility entry point with POSIX `strerror_r` semantics.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __xpg_strerror_r(
+    errnum: c_int,
+    buf: *mut c_char,
+    buflen: size_t,
+) -> c_int {
+    unsafe { strerror_r(errnum, buf, buflen) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlcat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, dstsize: size_t) -> size_t {

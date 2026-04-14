@@ -201,6 +201,12 @@ pub unsafe extern "C" fn endservent() {
     unsafe { SERVDB = 0 };
 }
 
+/// glibc resolver compatibility hook.
+#[unsafe(no_mangle)]
+pub extern "C" fn __res_init() -> c_int {
+    0
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/009696799/functions/gethostbyaddr.html>.
 /// Resolve a host name from a given network address.
 ///

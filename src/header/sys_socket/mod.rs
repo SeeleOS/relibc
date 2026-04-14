@@ -6,8 +6,14 @@ use core::{mem, ptr};
 
 use crate::{
     error::ResultExt,
-    header::{bits_iovec::iovec, bits_socklen_t::socklen_t},
+    header::{
+        bits_iovec::iovec,
+        bits_socklen_t::socklen_t,
+        errno::EINVAL,
+        fcntl::{self, F_GETFL, F_SETFL, F_SETFD, FD_CLOEXEC, O_CLOEXEC, O_NONBLOCK},
+    },
     platform::{
+        self,
         PalSocket, Sys,
         types::{
             c_char, c_int, c_long, c_uchar, c_uint, c_void, gid_t, pid_t, size_t, ssize_t, uid_t,
@@ -178,6 +184,53 @@ pub unsafe extern "C" fn accept(
         address,
         address_len
     )
+}
+
+/// Linux extension equivalent to `accept()` plus optional CLOEXEC/NONBLOCK fixups.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn accept4(
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+    flags: c_int,
+) -> c_int {
+    if (flags & !(O_CLOEXEC | O_NONBLOCK)) != 0 {
+        platform::ERRNO.set(EINVAL);
+        return -1;
+    }
+
+    let fd = unsafe { accept(socket, address, address_len) };
+    if fd < 0 {
+        return fd;
+    }
+
+    if (flags & O_NONBLOCK) != 0 {
+        let current = unsafe { fcntl::fcntl(fd, F_GETFL, 0) };
+        if current < 0
+            || unsafe {
+                fcntl::fcntl(
+                    fd,
+                    F_SETFL,
+                    (current | O_NONBLOCK) as crate::platform::types::c_ulonglong,
+                )
+            } < 0
+        {
+            return -1;
+        }
+    }
+    if (flags & O_CLOEXEC) != 0
+        && unsafe {
+            fcntl::fcntl(
+                fd,
+                F_SETFD,
+                FD_CLOEXEC as crate::platform::types::c_ulonglong,
+            )
+        } < 0
+    {
+        return -1;
+    }
+
+    fd
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/bind.html>.

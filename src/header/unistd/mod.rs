@@ -74,6 +74,8 @@ pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
+static GLIBC_VERSION: &[u8] = b"2.39\0";
+
 pub const L_cuserid: usize = 9;
 
 // confstr constants
@@ -779,6 +781,12 @@ pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
     Sys::lseek(fildes, offset, whence).or_minus_one_errno()
 }
 
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub extern "C" fn lseek64(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
+    lseek(fildes, offset, whence)
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nice.html>.
 // #[unsafe(no_mangle)]
 pub extern "C" fn nice(incr: c_int) -> c_int {
@@ -835,6 +843,17 @@ pub unsafe extern "C" fn pread(
     .or_minus_one_errno()
 }
 
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pread64(
+    fildes: c_int,
+    buf: *mut c_void,
+    nbyte: size_t,
+    offset: off_t,
+) -> ssize_t {
+    unsafe { pread(fildes, buf, nbyte, offset) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pwrite(
@@ -850,6 +869,89 @@ pub unsafe extern "C" fn pwrite(
     )
     .map(|read| read as ssize_t)
     .or_minus_one_errno()
+}
+
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pwrite64(
+    fildes: c_int,
+    buf: *const c_void,
+    nbyte: size_t,
+    offset: off_t,
+) -> ssize_t {
+    unsafe { pwrite(fildes, buf, nbyte, offset) }
+}
+
+/// Linux kernel-copy helper used by Rust's `std::io::copy` fast path.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sendfile64(
+    out_fd: c_int,
+    in_fd: c_int,
+    offset: *mut off_t,
+    count: size_t,
+) -> ssize_t {
+    const BUF_SIZE: usize = 16 * 1024;
+    let mut buf = [0_u8; BUF_SIZE];
+    let mut copied: size_t = 0;
+
+    while copied < count {
+        let chunk = core::cmp::min(BUF_SIZE, count - copied);
+        let read = if offset.is_null() {
+            Sys::read(in_fd, &mut buf[..chunk])
+        } else {
+            Sys::pread(in_fd, &mut buf[..chunk], unsafe { *offset })
+        };
+        let read = match read {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(err) => {
+                if copied != 0 {
+                    return copied as ssize_t;
+                }
+                return Err::<ssize_t, _>(err).or_minus_one_errno();
+            }
+        };
+
+        let mut written = 0;
+        while written < read {
+            match Sys::write(out_fd, &buf[written..read]) {
+                Ok(0) => {
+                    platform::ERRNO.set(errno::EIO);
+                    return if copied != 0 {
+                        copied as ssize_t
+                    } else {
+                        -1
+                    };
+                }
+                Ok(size) => written += size,
+                Err(err) => {
+                    if copied != 0 {
+                        return copied as ssize_t;
+                    }
+                    return Err::<ssize_t, _>(err).or_minus_one_errno();
+                }
+            }
+        }
+
+        if !offset.is_null() {
+            unsafe {
+                *offset += read as off_t;
+            }
+        }
+        copied += read;
+    }
+
+    copied as ssize_t
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sendfile(
+    out_fd: c_int,
+    in_fd: c_int,
+    offset: *mut off_t,
+    count: size_t,
+) -> ssize_t {
+    unsafe { sendfile64(out_fd, in_fd, offset, count) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
@@ -898,6 +1000,41 @@ pub unsafe extern "C" fn readlinkat(
                 .or_minus_one_errno()
         })
         .or_minus_one_errno()
+}
+
+/// Linux extension used by glibc-targeted code; currently supports `AT_FDCWD` only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn linkat(
+    olddirfd: c_int,
+    oldpath: *const c_char,
+    newdirfd: c_int,
+    newpath: *const c_char,
+    flags: c_int,
+) -> c_int {
+    if flags != 0 || olddirfd != fcntl::AT_FDCWD || newdirfd != fcntl::AT_FDCWD {
+        platform::ERRNO.set(errno::ENOSYS);
+        return -1;
+    }
+
+    unsafe { link(oldpath, newpath) }
+}
+
+/// Linux extension used by glibc-targeted code; currently supports `AT_FDCWD` only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn unlinkat(dirfd: c_int, path: *const c_char, flags: c_int) -> c_int {
+    if dirfd != fcntl::AT_FDCWD {
+        platform::ERRNO.set(errno::ENOSYS);
+        return -1;
+    }
+    if flags == 0 {
+        return unsafe { unlink(path) };
+    }
+    if flags == fcntl::AT_REMOVEDIR {
+        return unsafe { rmdir(path) };
+    }
+
+    platform::ERRNO.set(errno::EINVAL);
+    -1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rmdir.html>.
@@ -998,6 +1135,12 @@ pub extern "C" fn setuid(uid: uid_t) -> c_int {
     Sys::setresuid(uid, uid, -1)
         .map(|()| 0)
         .or_minus_one_errno()
+}
+
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub extern "C" fn ftruncate64(fildes: c_int, length: off_t) -> c_int {
+    ftruncate(fildes, length)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sleep.html>.
@@ -1175,6 +1318,34 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     Sys::unlink(path).map(|()| 0).or_minus_one_errno()
+}
+
+/// Linux extension that many upstream crates probe for. Seele does not expose a raw syscall ABI.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn syscall(num: c_long, mut _args: ...) -> c_long {
+    let _ = num;
+    platform::ERRNO.set(errno::ENOSYS);
+    -1
+}
+
+/// glibc version probe used by Rust's Unix PAL.
+#[unsafe(no_mangle)]
+pub extern "C" fn gnu_get_libc_version() -> *const c_char {
+    GLIBC_VERSION.as_ptr().cast()
+}
+
+/// Linux zero-copy pipe helper. Return `ENOSYS` until the kernel exposes an equivalent primitive.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn splice(
+    _fd_in: c_int,
+    _off_in: *mut off_t,
+    _fd_out: c_int,
+    _off_out: *mut off_t,
+    _len: size_t,
+    _flags: c_uint,
+) -> ssize_t {
+    platform::ERRNO.set(errno::ENOSYS);
+    -1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/usleep.html>.

@@ -267,6 +267,15 @@ pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> 
     }
 }
 
+/// Linux extension used by GLib and Rust crates; name assignment is currently a no-op on Seele.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pthread_setname_np(
+    _thread: pthread_t,
+    _name: *const crate::platform::types::c_char,
+) -> c_int {
+    0
+}
+
 // Not in latest POSIX, mark as depreciated?
 /// See <https://pubs.opengroup.org/onlinepubs/000095399/functions/pthread_setconcurrency.html>.
 #[unsafe(no_mangle)]

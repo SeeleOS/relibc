@@ -251,6 +251,12 @@ pub extern "C" fn readdir(dir: &mut DIR) -> *mut dirent {
     dir.next_dirent().or_errno_null_mut()
 }
 
+/// Linux large-file compatibility alias.
+#[unsafe(no_mangle)]
+pub extern "C" fn readdir64(dir: &mut DIR) -> *mut dirent {
+    readdir(dir)
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
 ///
 /// # Deprecation
