@@ -1,243 +1,163 @@
-/* Copyright (C) 2013-2022 Free Software Foundation, Inc.
+/*===---- stdatomic.h - Standard header for atomic types and operations -----===
+ *
+ * Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+ * See https://llvm.org/LICENSE.txt for license information.
+ * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+ *
+ * This variant is used by relibc because Seele targets are built with Clang.
+ * The GCC stdatomic.h implementation relies on __atomic builtins in a way that
+ * Clang rejects for _Atomic-qualified pointers.
+ *===-----------------------------------------------------------------------===
+ */
 
-This file is part of GCC.
+#ifndef __RELIBC_STDATOMIC_H
+#define __RELIBC_STDATOMIC_H
 
-GCC is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3, or (at your option)
-any later version.
+#include <stddef.h>
+#include <stdint.h>
 
-GCC is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-Under Section 7 of GPL version 3, you are granted additional
-permissions described in the GCC Runtime Library Exception, version
-3.1, as published by the Free Software Foundation.
+#define ATOMIC_BOOL_LOCK_FREE __CLANG_ATOMIC_BOOL_LOCK_FREE
+#define ATOMIC_CHAR_LOCK_FREE __CLANG_ATOMIC_CHAR_LOCK_FREE
+#define ATOMIC_CHAR16_T_LOCK_FREE __CLANG_ATOMIC_CHAR16_T_LOCK_FREE
+#define ATOMIC_CHAR32_T_LOCK_FREE __CLANG_ATOMIC_CHAR32_T_LOCK_FREE
+#define ATOMIC_WCHAR_T_LOCK_FREE __CLANG_ATOMIC_WCHAR_T_LOCK_FREE
+#define ATOMIC_SHORT_LOCK_FREE __CLANG_ATOMIC_SHORT_LOCK_FREE
+#define ATOMIC_INT_LOCK_FREE __CLANG_ATOMIC_INT_LOCK_FREE
+#define ATOMIC_LONG_LOCK_FREE __CLANG_ATOMIC_LONG_LOCK_FREE
+#define ATOMIC_LLONG_LOCK_FREE __CLANG_ATOMIC_LLONG_LOCK_FREE
+#define ATOMIC_POINTER_LOCK_FREE __CLANG_ATOMIC_POINTER_LOCK_FREE
 
-You should have received a copy of the GNU General Public License and
-a copy of the GCC Runtime Library Exception along with this program;
-see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
-<http://www.gnu.org/licenses/>.  */
+#if (defined(__STDC_VERSION__) && __STDC_VERSION__ < 202311L) || defined(__cplusplus)
+#define ATOMIC_VAR_INIT(value) (value)
+#endif
 
-/* ISO C11 Standard:  7.17  Atomics <stdatomic.h>.  */
+#define atomic_init __c11_atomic_init
 
-#ifndef _STDATOMIC_H
-#define _STDATOMIC_H
-
-typedef enum
-  {
+typedef enum memory_order {
     memory_order_relaxed = __ATOMIC_RELAXED,
     memory_order_consume = __ATOMIC_CONSUME,
     memory_order_acquire = __ATOMIC_ACQUIRE,
     memory_order_release = __ATOMIC_RELEASE,
     memory_order_acq_rel = __ATOMIC_ACQ_REL,
     memory_order_seq_cst = __ATOMIC_SEQ_CST
-  } memory_order;
+} memory_order;
 
+#define kill_dependency(y) (y)
 
-typedef _Atomic _Bool atomic_bool;
-typedef _Atomic char atomic_char;
-typedef _Atomic signed char atomic_schar;
-typedef _Atomic unsigned char atomic_uchar;
-typedef _Atomic short atomic_short;
-typedef _Atomic unsigned short atomic_ushort;
-typedef _Atomic int atomic_int;
-typedef _Atomic unsigned int atomic_uint;
-typedef _Atomic long atomic_long;
-typedef _Atomic unsigned long atomic_ulong;
-typedef _Atomic long long atomic_llong;
-typedef _Atomic unsigned long long atomic_ullong;
-typedef _Atomic __CHAR16_TYPE__ atomic_char16_t;
-typedef _Atomic __CHAR32_TYPE__ atomic_char32_t;
-typedef _Atomic __WCHAR_TYPE__ atomic_wchar_t;
-typedef _Atomic __INT_LEAST8_TYPE__ atomic_int_least8_t;
-typedef _Atomic __UINT_LEAST8_TYPE__ atomic_uint_least8_t;
-typedef _Atomic __INT_LEAST16_TYPE__ atomic_int_least16_t;
-typedef _Atomic __UINT_LEAST16_TYPE__ atomic_uint_least16_t;
-typedef _Atomic __INT_LEAST32_TYPE__ atomic_int_least32_t;
-typedef _Atomic __UINT_LEAST32_TYPE__ atomic_uint_least32_t;
-typedef _Atomic __INT_LEAST64_TYPE__ atomic_int_least64_t;
-typedef _Atomic __UINT_LEAST64_TYPE__ atomic_uint_least64_t;
-typedef _Atomic __INT_FAST8_TYPE__ atomic_int_fast8_t;
-typedef _Atomic __UINT_FAST8_TYPE__ atomic_uint_fast8_t;
-typedef _Atomic __INT_FAST16_TYPE__ atomic_int_fast16_t;
-typedef _Atomic __UINT_FAST16_TYPE__ atomic_uint_fast16_t;
-typedef _Atomic __INT_FAST32_TYPE__ atomic_int_fast32_t;
-typedef _Atomic __UINT_FAST32_TYPE__ atomic_uint_fast32_t;
-typedef _Atomic __INT_FAST64_TYPE__ atomic_int_fast64_t;
-typedef _Atomic __UINT_FAST64_TYPE__ atomic_uint_fast64_t;
-typedef _Atomic __INTPTR_TYPE__ atomic_intptr_t;
-typedef _Atomic __UINTPTR_TYPE__ atomic_uintptr_t;
-typedef _Atomic __SIZE_TYPE__ atomic_size_t;
-typedef _Atomic __PTRDIFF_TYPE__ atomic_ptrdiff_t;
-typedef _Atomic __INTMAX_TYPE__ atomic_intmax_t;
-typedef _Atomic __UINTMAX_TYPE__ atomic_uintmax_t;        
+void atomic_thread_fence(memory_order);
+void atomic_signal_fence(memory_order);
 
+#define atomic_thread_fence(order) __c11_atomic_thread_fence(order)
+#define atomic_signal_fence(order) __c11_atomic_signal_fence(order)
 
-#define ATOMIC_VAR_INIT(VALUE)	(VALUE)
+#define atomic_is_lock_free(obj) __c11_atomic_is_lock_free(sizeof(*(obj)))
 
-/* Initialize an atomic object pointed to by PTR with VAL.  */
-#define atomic_init(PTR, VAL)                           \
-  atomic_store_explicit (PTR, VAL, __ATOMIC_RELAXED)
-
-#define kill_dependency(Y)			\
-  __extension__					\
-  ({						\
-    __auto_type __kill_dependency_tmp = (Y);	\
-    __kill_dependency_tmp;			\
-  })
-
-extern void atomic_thread_fence (memory_order);
-#define atomic_thread_fence(MO)	__atomic_thread_fence (MO)
-extern void atomic_signal_fence (memory_order);
-#define atomic_signal_fence(MO)	__atomic_signal_fence  (MO)
-#define atomic_is_lock_free(OBJ) __atomic_is_lock_free (sizeof (*(OBJ)), (OBJ))
-
-#define ATOMIC_BOOL_LOCK_FREE		__GCC_ATOMIC_BOOL_LOCK_FREE
-#define ATOMIC_CHAR_LOCK_FREE		__GCC_ATOMIC_CHAR_LOCK_FREE
-#define ATOMIC_CHAR16_T_LOCK_FREE	__GCC_ATOMIC_CHAR16_T_LOCK_FREE
-#define ATOMIC_CHAR32_T_LOCK_FREE	__GCC_ATOMIC_CHAR32_T_LOCK_FREE
-#define ATOMIC_WCHAR_T_LOCK_FREE	__GCC_ATOMIC_WCHAR_T_LOCK_FREE
-#define ATOMIC_SHORT_LOCK_FREE		__GCC_ATOMIC_SHORT_LOCK_FREE
-#define ATOMIC_INT_LOCK_FREE		__GCC_ATOMIC_INT_LOCK_FREE
-#define ATOMIC_LONG_LOCK_FREE		__GCC_ATOMIC_LONG_LOCK_FREE
-#define ATOMIC_LLONG_LOCK_FREE		__GCC_ATOMIC_LLONG_LOCK_FREE
-#define ATOMIC_POINTER_LOCK_FREE	__GCC_ATOMIC_POINTER_LOCK_FREE
-
-
-/* Note that these macros require __auto_type to remove
-   _Atomic qualifiers (and const qualifiers, if those are valid on
-   macro operands).
-   
-   Also note that the header file uses the generic form of __atomic
-   builtins, which requires the address to be taken of the value
-   parameter, and then we pass that value on.  This allows the macros
-   to work for any type, and the compiler is smart enough to convert
-   these to lock-free _N variants if possible, and throw away the
-   temps.  */
-
-#define atomic_store_explicit(PTR, VAL, MO)				\
-  __extension__								\
-  ({									\
-    __auto_type __atomic_store_ptr = (PTR);				\
-    __typeof__ ((void)0, *__atomic_store_ptr) __atomic_store_tmp = (VAL);	\
-    __atomic_store (__atomic_store_ptr, &__atomic_store_tmp, (MO));	\
-  })
-
-#define atomic_store(PTR, VAL)				\
-  atomic_store_explicit (PTR, VAL, __ATOMIC_SEQ_CST)
-
-
-#define atomic_load_explicit(PTR, MO)					\
-  __extension__								\
-  ({									\
-    __auto_type __atomic_load_ptr = (PTR);				\
-    __typeof__ ((void)0, *__atomic_load_ptr) __atomic_load_tmp;			\
-    __atomic_load (__atomic_load_ptr, &__atomic_load_tmp, (MO));	\
-    __atomic_load_tmp;							\
-  })
-
-#define atomic_load(PTR)  atomic_load_explicit (PTR, __ATOMIC_SEQ_CST)
-
-
-#define atomic_exchange_explicit(PTR, VAL, MO)				\
-  __extension__								\
-  ({									\
-    __auto_type __atomic_exchange_ptr = (PTR);				\
-    __typeof__ ((void)0, *__atomic_exchange_ptr) __atomic_exchange_val = (VAL);	\
-    __typeof__ ((void)0, *__atomic_exchange_ptr) __atomic_exchange_tmp;		\
-    __atomic_exchange (__atomic_exchange_ptr, &__atomic_exchange_val,	\
-		       &__atomic_exchange_tmp, (MO));			\
-    __atomic_exchange_tmp;						\
-  })
-
-#define atomic_exchange(PTR, VAL) 			\
-  atomic_exchange_explicit (PTR, VAL, __ATOMIC_SEQ_CST)
-
-
-#define atomic_compare_exchange_strong_explicit(PTR, VAL, DES, SUC, FAIL) \
-  __extension__								\
-  ({									\
-    __auto_type __atomic_compare_exchange_ptr = (PTR);			\
-    __typeof__ ((void)0, *__atomic_compare_exchange_ptr) __atomic_compare_exchange_tmp \
-      = (DES);								\
-    __atomic_compare_exchange (__atomic_compare_exchange_ptr, (VAL),	\
-			       &__atomic_compare_exchange_tmp, 0,	\
-			       (SUC), (FAIL));				\
-  })
-
-#define atomic_compare_exchange_strong(PTR, VAL, DES) 			   \
-  atomic_compare_exchange_strong_explicit (PTR, VAL, DES, __ATOMIC_SEQ_CST, \
-					   __ATOMIC_SEQ_CST)
-
-#define atomic_compare_exchange_weak_explicit(PTR, VAL, DES, SUC, FAIL) \
-  __extension__								\
-  ({									\
-    __auto_type __atomic_compare_exchange_ptr = (PTR);			\
-    __typeof__ ((void)0, *__atomic_compare_exchange_ptr) __atomic_compare_exchange_tmp \
-      = (DES);								\
-    __atomic_compare_exchange (__atomic_compare_exchange_ptr, (VAL),	\
-			       &__atomic_compare_exchange_tmp, 1,	\
-			       (SUC), (FAIL));				\
-  })
-
-#define atomic_compare_exchange_weak(PTR, VAL, DES)			\
-  atomic_compare_exchange_weak_explicit (PTR, VAL, DES, __ATOMIC_SEQ_CST, \
-					 __ATOMIC_SEQ_CST)
-
-
-
-#define atomic_fetch_add(PTR, VAL) __atomic_fetch_add ((PTR), (VAL), 	\
-						       __ATOMIC_SEQ_CST)
-#define atomic_fetch_add_explicit(PTR, VAL, MO) 			\
-			  __atomic_fetch_add ((PTR), (VAL), (MO))
-
-#define atomic_fetch_sub(PTR, VAL) __atomic_fetch_sub ((PTR), (VAL), 	\
-						       __ATOMIC_SEQ_CST)
-#define atomic_fetch_sub_explicit(PTR, VAL, MO) 			\
-			  __atomic_fetch_sub ((PTR), (VAL), (MO))
-
-#define atomic_fetch_or(PTR, VAL) __atomic_fetch_or ((PTR), (VAL), 	\
-						       __ATOMIC_SEQ_CST)
-#define atomic_fetch_or_explicit(PTR, VAL, MO) 			\
-			  __atomic_fetch_or ((PTR), (VAL), (MO))
-
-#define atomic_fetch_xor(PTR, VAL) __atomic_fetch_xor ((PTR), (VAL), 	\
-						       __ATOMIC_SEQ_CST)
-#define atomic_fetch_xor_explicit(PTR, VAL, MO) 			\
-			  __atomic_fetch_xor ((PTR), (VAL), (MO))
-
-#define atomic_fetch_and(PTR, VAL) __atomic_fetch_and ((PTR), (VAL), 	\
-						       __ATOMIC_SEQ_CST)
-#define atomic_fetch_and_explicit(PTR, VAL, MO) 			\
-			  __atomic_fetch_and ((PTR), (VAL), (MO))
-
-
-typedef _Atomic struct
-{
-#if __GCC_ATOMIC_TEST_AND_SET_TRUEVAL == 1
-  _Bool __val;
+#ifdef __cplusplus
+typedef _Atomic(bool) atomic_bool;
 #else
-  unsigned char __val;
+typedef _Atomic(_Bool) atomic_bool;
 #endif
+typedef _Atomic(char) atomic_char;
+typedef _Atomic(signed char) atomic_schar;
+typedef _Atomic(unsigned char) atomic_uchar;
+typedef _Atomic(short) atomic_short;
+typedef _Atomic(unsigned short) atomic_ushort;
+typedef _Atomic(int) atomic_int;
+typedef _Atomic(unsigned int) atomic_uint;
+typedef _Atomic(long) atomic_long;
+typedef _Atomic(unsigned long) atomic_ulong;
+typedef _Atomic(long long) atomic_llong;
+typedef _Atomic(unsigned long long) atomic_ullong;
+typedef _Atomic(uint_least16_t) atomic_char16_t;
+typedef _Atomic(uint_least32_t) atomic_char32_t;
+typedef _Atomic(wchar_t) atomic_wchar_t;
+typedef _Atomic(int_least8_t) atomic_int_least8_t;
+typedef _Atomic(uint_least8_t) atomic_uint_least8_t;
+typedef _Atomic(int_least16_t) atomic_int_least16_t;
+typedef _Atomic(uint_least16_t) atomic_uint_least16_t;
+typedef _Atomic(int_least32_t) atomic_int_least32_t;
+typedef _Atomic(uint_least32_t) atomic_uint_least32_t;
+typedef _Atomic(int_least64_t) atomic_int_least64_t;
+typedef _Atomic(uint_least64_t) atomic_uint_least64_t;
+typedef _Atomic(int_fast8_t) atomic_int_fast8_t;
+typedef _Atomic(uint_fast8_t) atomic_uint_fast8_t;
+typedef _Atomic(int_fast16_t) atomic_int_fast16_t;
+typedef _Atomic(uint_fast16_t) atomic_uint_fast16_t;
+typedef _Atomic(int_fast32_t) atomic_int_fast32_t;
+typedef _Atomic(uint_fast32_t) atomic_uint_fast32_t;
+typedef _Atomic(int_fast64_t) atomic_int_fast64_t;
+typedef _Atomic(uint_fast64_t) atomic_uint_fast64_t;
+typedef _Atomic(intptr_t) atomic_intptr_t;
+typedef _Atomic(uintptr_t) atomic_uintptr_t;
+typedef _Atomic(size_t) atomic_size_t;
+typedef _Atomic(ptrdiff_t) atomic_ptrdiff_t;
+typedef _Atomic(intmax_t) atomic_intmax_t;
+typedef _Atomic(uintmax_t) atomic_uintmax_t;
+
+#define atomic_store(object, desired) __c11_atomic_store(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_store_explicit __c11_atomic_store
+
+#define atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
+#define atomic_load_explicit __c11_atomic_load
+
+#define atomic_exchange(object, desired) __c11_atomic_exchange(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_exchange_explicit __c11_atomic_exchange
+
+#define atomic_compare_exchange_strong(object, expected, desired) \
+    __c11_atomic_compare_exchange_strong(object, expected, desired, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_strong_explicit __c11_atomic_compare_exchange_strong
+
+#define atomic_compare_exchange_weak(object, expected, desired) \
+    __c11_atomic_compare_exchange_weak(object, expected, desired, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_weak_explicit __c11_atomic_compare_exchange_weak
+
+#define atomic_fetch_add(object, operand) __c11_atomic_fetch_add(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_add_explicit __c11_atomic_fetch_add
+
+#define atomic_fetch_sub(object, operand) __c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_sub_explicit __c11_atomic_fetch_sub
+
+#define atomic_fetch_or(object, operand) __c11_atomic_fetch_or(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_or_explicit __c11_atomic_fetch_or
+
+#define atomic_fetch_xor(object, operand) __c11_atomic_fetch_xor(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_xor_explicit __c11_atomic_fetch_xor
+
+#define atomic_fetch_and(object, operand) __c11_atomic_fetch_and(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_and_explicit __c11_atomic_fetch_and
+
+typedef struct atomic_flag {
+    atomic_bool _Value;
 } atomic_flag;
 
-#define ATOMIC_FLAG_INIT	{ 0 }
+#ifdef __cplusplus
+#define ATOMIC_FLAG_INIT { false }
+#else
+#define ATOMIC_FLAG_INIT { 0 }
+#endif
 
+#ifdef __cplusplus
+bool atomic_flag_test_and_set(volatile atomic_flag *);
+bool atomic_flag_test_and_set_explicit(volatile atomic_flag *, memory_order);
+#else
+_Bool atomic_flag_test_and_set(volatile atomic_flag *);
+_Bool atomic_flag_test_and_set_explicit(volatile atomic_flag *, memory_order);
+#endif
+void atomic_flag_clear(volatile atomic_flag *);
+void atomic_flag_clear_explicit(volatile atomic_flag *, memory_order);
 
-extern _Bool atomic_flag_test_and_set (volatile atomic_flag *);
-#define atomic_flag_test_and_set(PTR) 					\
-			__atomic_test_and_set ((PTR), __ATOMIC_SEQ_CST)
-extern _Bool atomic_flag_test_and_set_explicit (volatile atomic_flag *,
-						memory_order);
-#define atomic_flag_test_and_set_explicit(PTR, MO)			\
-			__atomic_test_and_set ((PTR), (MO))
+#define atomic_flag_test_and_set(object) __c11_atomic_exchange(&(object)->_Value, 1, __ATOMIC_SEQ_CST)
+#define atomic_flag_test_and_set_explicit(object, order) __c11_atomic_exchange(&(object)->_Value, 1, order)
 
-extern void atomic_flag_clear (volatile atomic_flag *);
-#define atomic_flag_clear(PTR)	__atomic_clear ((PTR), __ATOMIC_SEQ_CST)
-extern void atomic_flag_clear_explicit (volatile atomic_flag *, memory_order);
-#define atomic_flag_clear_explicit(PTR, MO)   __atomic_clear ((PTR), (MO))
+#define atomic_flag_clear(object) __c11_atomic_store(&(object)->_Value, 0, __ATOMIC_SEQ_CST)
+#define atomic_flag_clear_explicit(object, order) __c11_atomic_store(&(object)->_Value, 0, order)
 
-#endif  /* _STDATOMIC_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif
