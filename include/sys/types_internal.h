@@ -13,6 +13,7 @@ typedef unsigned long nlink_t;
 typedef long long off_t;
 typedef int pid_t;
 typedef unsigned id_t;
+typedef int key_t;
 typedef long ssize_t;
 typedef long long time_t;
 typedef unsigned int useconds_t;
