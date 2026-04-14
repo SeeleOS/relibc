@@ -59,6 +59,7 @@
 #include <sys/auxv.h>
 #include <sys/epoll.h>
 #include <sys/file.h>
+#include <sys/ipc.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/procfs.h>

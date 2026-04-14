@@ -92,7 +92,7 @@ pub mod sys_epoll;
 pub mod sys_file;
 pub mod sys_ioctl;
 pub mod sys_kd;
-// TODO: sys/ipc.h
+pub mod sys_ipc;
 pub mod sys_mman;
 // TODO: sys/msg.h
 pub mod sys_ptrace;
