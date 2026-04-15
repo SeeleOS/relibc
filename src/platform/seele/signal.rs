@@ -33,10 +33,49 @@ use crate::{
     error::{Errno, Result},
     header::{
         bits_time::timespec,
-        signal::{SI_QUEUE, SIG_DFL, SIG_IGN, sigaction, siginfo_t, sigset_t, stack_t},
+        errno::ENOMEM,
+        signal::{
+            MINSIGSTKSZ, SI_QUEUE, SIG_DFL, SIG_IGN, SS_DISABLE, sigaction, siginfo_t, sigset_t,
+            stack_t,
+        },
         sys_time::itimerval,
     },
 };
+use core::ptr;
+use spin::Mutex;
+
+#[derive(Clone, Copy)]
+struct SigAltStackState {
+    ss_sp: usize,
+    ss_flags: c_int,
+    ss_size: usize,
+}
+
+impl SigAltStackState {
+    const DISABLED: Self = Self {
+        ss_sp: 0,
+        ss_flags: SS_DISABLE as c_int,
+        ss_size: 0,
+    };
+
+    fn as_stack_t(self) -> stack_t {
+        stack_t {
+            ss_sp: self.ss_sp as *mut _,
+            ss_flags: self.ss_flags,
+            ss_size: self.ss_size,
+        }
+    }
+
+    fn from_stack_t(stack: &stack_t) -> Self {
+        Self {
+            ss_sp: stack.ss_sp as usize,
+            ss_flags: stack.ss_flags,
+            ss_size: stack.ss_size,
+        }
+    }
+}
+
+static SIGALTSTACK_STATE: Mutex<SigAltStackState> = Mutex::new(SigAltStackState::DISABLED);
 
 unsafe extern "C" fn __seele_restore_rt() {
     let _ = sig_handler_return();
@@ -202,8 +241,36 @@ impl PalSignal for Sys {
     }
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()> {
-        let _ = (ss, old_ss);
-        Sys::stub("SIGALTSTACK").map(|_| ())
+        let mut state = SIGALTSTACK_STATE.lock();
+
+        if let Some(old_ss) = old_ss {
+            *old_ss = state.as_stack_t();
+        }
+
+        let Some(new_ss) = ss else {
+            return Ok(());
+        };
+
+        let allowed_flags = SS_DISABLE as c_int;
+        if (new_ss.ss_flags & !allowed_flags) != 0 {
+            return Err(Errno(EINVAL));
+        }
+
+        if (new_ss.ss_flags & SS_DISABLE as c_int) != 0 {
+            *state = SigAltStackState::DISABLED;
+            return Ok(());
+        }
+
+        if new_ss.ss_sp.is_null() {
+            return Err(Errno(EINVAL));
+        }
+
+        if new_ss.ss_size < MINSIGSTKSZ {
+            return Err(Errno(ENOMEM));
+        }
+
+        *state = SigAltStackState::from_stack_t(new_ss);
+        Ok(())
     }
 
     fn sigpending(set: &mut sigset_t) -> Result<()> {
