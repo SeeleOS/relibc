@@ -11,8 +11,8 @@ use crate::{
     header::{
         errno,
         sys_epoll::{
-            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_create1, epoll_ctl,
-            epoll_data, epoll_event, epoll_wait,
+            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, epoll_create1,
+            epoll_ctl, epoll_data, epoll_event, epoll_wait,
         },
     },
     platform::{
@@ -73,28 +73,34 @@ pub fn select_epoll(
 
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;
+    let mut seen: bitset = BitSet::default();
     for fd in 0..nfds {
         let mut events = 0;
+        let mut watched = false;
 
         if let Some(ref fd_set) = read_bitset
             && fd_set.contains(fd as usize)
         {
-            events |= EPOLLIN;
+            watched = true;
+            events |= EPOLLIN | EPOLLHUP;
         }
 
         if let Some(ref fd_set) = write_bitset
             && fd_set.contains(fd as usize)
         {
-            events |= EPOLLOUT;
+            watched = true;
+            events |= EPOLLOUT | EPOLLHUP;
         }
 
         if let Some(ref fd_set) = except_bitset
             && fd_set.contains(fd as usize)
         {
+            watched = true;
             events |= EPOLLERR;
         }
 
-        if events > 0 {
+        if watched {
+            events |= EPOLLERR;
             let mut event = epoll_event {
                 events,
                 data: epoll_data { fd },
@@ -162,22 +168,29 @@ pub fn select_epoll(
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
         if fd >= 0 && fd < FD_SETSIZE as c_int {
-            if event.events & EPOLLIN > 0
+            let mut inserted = false;
+
+            if event.events & (EPOLLIN | EPOLLHUP) > 0
                 && let Some(ref mut fd_set) = read_bitset
             {
                 fd_set.insert(fd as usize);
-                count += 1;
+                inserted = true;
             }
             if event.events & EPOLLOUT > 0
                 && let Some(ref mut fd_set) = write_bitset
             {
                 fd_set.insert(fd as usize);
-                count += 1;
+                inserted = true;
             }
             if event.events & EPOLLERR > 0
                 && let Some(ref mut fd_set) = except_bitset
             {
                 fd_set.insert(fd as usize);
+                inserted = true;
+            }
+
+            if inserted && !seen.contains(fd as usize) {
+                seen.insert(fd as usize);
                 count += 1;
             }
         }

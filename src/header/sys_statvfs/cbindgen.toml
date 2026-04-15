@@ -1,5 +1,11 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STATVFS_H"
+trailer = """
+#define f_flags f_flag
+#ifndef MNT_LOCAL
+#define MNT_LOCAL 0x1000
+#endif
+"""
 language = "C"
 style = "Tag"
 no_includes = true

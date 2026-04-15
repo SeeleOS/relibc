@@ -66,6 +66,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     };
 
     let mut closed = 0;
+    let mut active = 0;
     for (i, fd) in fds.iter_mut().enumerate() {
         let pfd = fd;
 
@@ -75,9 +76,10 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
         if pfd.fd < 0 {
             continue;
         }
+        active += 1;
 
         let mut event = epoll_event {
-            events: 0,
+            events: EPOLLERR | EPOLLHUP,
             data: epoll_data { u64: i as u64 },
             ..Default::default()
         };
@@ -99,7 +101,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
     }
 
     // Early exit if there are fds, and all are closed (revents = POLLNVAL)
-    if closed > 0 && closed == fds.len() {
+    if closed > 0 && closed == active {
         return closed as i32;
     }
 

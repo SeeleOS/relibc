@@ -60,6 +60,24 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_madvise.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn posix_madvise(addr: *mut c_void, len: size_t, advice: c_int) -> c_int {
+    let linux_advice = match advice {
+        POSIX_MADV_NORMAL => MADV_NORMAL,
+        POSIX_MADV_RANDOM => MADV_RANDOM,
+        POSIX_MADV_SEQUENTIAL => MADV_SEQUENTIAL,
+        POSIX_MADV_WILLNEED => MADV_WILLNEED,
+        POSIX_MADV_WONTNEED => MADV_DONTNEED,
+        _ => return crate::header::errno::EINVAL,
+    };
+
+    match unsafe { Sys::madvise(addr, len, linux_advice) } {
+        Ok(()) => 0,
+        Err(Errno(errno)) => errno,
+    }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlock.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {

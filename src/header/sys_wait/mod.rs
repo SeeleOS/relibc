@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+const RUSAGE_CHILDREN: c_int = -1;
+
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
 
@@ -83,4 +85,27 @@ pub unsafe extern "C" fn waitid(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
     Sys::waitpid(pid, unsafe { Out::nullable(stat_loc) }, options).or_minus_one_errno()
+}
+
+/// Linux-compatible extension used by LLVM.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wait4(
+    pid: pid_t,
+    stat_loc: *mut c_int,
+    options: c_int,
+    usage: *mut crate::header::sys_resource::rusage,
+) -> pid_t {
+    let waited = Sys::waitpid(pid, unsafe { Out::nullable(stat_loc) }, options).or_minus_one_errno();
+    if waited <= 0 {
+        return waited;
+    }
+
+    if !usage.is_null() {
+        let usage_out = unsafe { Out::from_mut(&mut *usage) };
+        if Sys::getrusage(RUSAGE_CHILDREN, usage_out).is_err() {
+            unsafe { core::ptr::write_bytes(usage, 0, 1) };
+        }
+    }
+
+    waited
 }
