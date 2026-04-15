@@ -55,7 +55,7 @@ use crate::{
         },
         sys_resource::{RLIM_INFINITY, RLIMIT_NOFILE, rlimit, rusage},
         sys_select::timeval,
-        sys_socket::constants::{AF_UNIX, SOCK_NONBLOCK, SOCK_STREAM},
+        sys_socket::constants::{AF_UNIX, SHUT_RD, SHUT_WR, SOCK_NONBLOCK, SOCK_STREAM},
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
@@ -92,6 +92,7 @@ pub use unwind_stub::*;
 
 const PRINT_STUB_MESSAGE: bool = true;
 static SIGPROCMASK_STATE: AtomicU64 = AtomicU64::new(0);
+const DEADLOCK_LOG: bool = false;
 
 fn prot_to_permissions(prot: c_int) -> Permissions {
     let mut permissions = Permissions::empty();
@@ -637,6 +638,7 @@ impl Pal for Sys {
     }
 
     fn close(fildes: c_int) -> Result<()> {
+        epoll::forget_fd(fildes);
         e_raw(process_result(remove_object(fildes as u64))).map(|_| ())
     }
 
@@ -1302,6 +1304,23 @@ impl Pal for Sys {
             };
         let fds = unsafe { &mut *fildes.as_mut_ptr() };
         <Sys as crate::platform::PalSocket>::socketpair(AF_UNIX, socket_kind, 0, fds)?;
+        if DEADLOCK_LOG {
+            Self::print_stub_message(format_args!(
+                "seele pipe2 create flags=0x{:x} read_fd={} write_fd={}\n",
+                flags, fds[0], fds[1]
+            ));
+        }
+
+        // Emulate a real pipe instead of exposing a fully-duplex socketpair:
+        // fds[0] is read-only, fds[1] is write-only.
+        <Sys as crate::platform::PalSocket>::shutdown(fds[0], SHUT_WR)?;
+        <Sys as crate::platform::PalSocket>::shutdown(fds[1], SHUT_RD)?;
+        if DEADLOCK_LOG {
+            Self::print_stub_message(format_args!(
+                "seele pipe2 shutdown read_fd={} write_fd={}\n",
+                fds[0], fds[1]
+            ));
+        }
 
         if (flags & O_CLOEXEC) != 0 {
             Self::fcntl(fds[0], F_SETFD, FD_CLOEXEC as c_ulonglong)?;
